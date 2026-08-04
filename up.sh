@@ -29,13 +29,13 @@ echo "\n=== Create Postgres DB  ===\n"
 
 kubectl apply -f k8s/postgres-cluster.yaml
 
-echo "\n=== Apply the SymDs engine configmaps  ===\n"
+echo "\n=== Apply the SymDs configs  ===\n"
 
 kubectl apply -f k8s/symds-identity-ora-engine-configmap.yaml
 kubectl apply -f k8s/symds-identity-pg-engine-configmap.yaml
+kubectl apply -f k8s/symds-identity-ora-deployment.yaml
 
 echo "\n=== Waiting for Oracle pods to be up... ===\n"
-
 
 kubectl wait --for=condition=Ready pod/identity-ora --timeout=300s
 

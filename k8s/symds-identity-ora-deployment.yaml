@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: symds-oracle
+  namespace: default
+  labels:
+    app: symds-oracle
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: symds-oracle
+  template:
+    metadata:
+      labels:
+        app: symds-oracle
+    spec:
+      initContainers:
+        - name: create-sym-table
+          image: jumpmind/symmetricds:3.16
+          command:
+            - "/opt/symmetric-ds/bin/symadmin"
+            - "--engine"
+            - "oracle-000"
+            - "create-sym-tables"
+          env:
+            - name: SYMDS_ORACLE_DB_USERNAME
+              value: identity
+            - name: SYMDS_ORACLE_DB_PASSWORD
+              value: identity
+          volumeMounts:
+            - name: engine-config
+              mountPath: /opt/symmetric-ds/engines
+      containers:
+        - name: symmetricds
+          image: jumpmind/symmetricds:3.16
+          ports:
+            - containerPort: 31415
+          env:
+            - name: SYMDS_ORACLE_DB_USERNAME
+              value: identity
+            - name: SYMDS_ORACLE_DB_PASSWORD
+              value: identity
+          volumeMounts:
+            - name: engine-config
+              mountPath: /opt/symmetric-ds/engines
+          readinessProbe:
+            httpGet:
+              path: /sync/ping
+              port: 31415
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /sync/ping
+              port: 31415
+            initialDelaySeconds: 40
+            periodSeconds: 30
+      volumes:
+        - name: engine-config
+          configMap:
+            name: oracle-engine-config
+        - name: symds-oracle-dbmate-files
+          configMap:
+            name: symds-oracle-dbmate-files
+
