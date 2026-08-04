@@ -27,9 +27,15 @@ spec:
             - "create-sym-tables"
           env:
             - name: SYMDS_ORACLE_DB_USERNAME
-              value: identity
+              valueFrom:
+                secretKeyRef:
+                  name: symds
+                  key: oracle-db-username
             - name: SYMDS_ORACLE_DB_PASSWORD
-              value: identity
+              valueFrom:
+                secretKeyRef:
+                  name: symds
+                  key: oracle-db-password
           volumeMounts:
             - name: engine-config
               mountPath: /opt/symmetric-ds/engines
@@ -40,9 +46,15 @@ spec:
             - containerPort: 31415
           env:
             - name: SYMDS_ORACLE_DB_USERNAME
-              value: identity
+              valueFrom:
+                secretKeyRef:
+                  name: symds
+                  key: oracle-db-username
             - name: SYMDS_ORACLE_DB_PASSWORD
-              value: identity
+              valueFrom:
+                secretKeyRef:
+                  name: symds
+                  key: oracle-db-password
           volumeMounts:
             - name: engine-config
               mountPath: /opt/symmetric-ds/engines
@@ -62,8 +74,5 @@ spec:
       volumes:
         - name: engine-config
           configMap:
-            name: oracle-engine-config
-        - name: symds-oracle-dbmate-files
-          configMap:
-            name: symds-oracle-dbmate-files
+            name: identity-ora-engine-config
 

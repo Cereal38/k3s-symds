@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: symds-flyway-files
+  namespace: default
+data:
+  # Applied by the Flyway initContainer of the identity node, in the ROOT node's
+  # Oracle database. The oracle node group is not inserted here: SymmetricDS
+  # creates it itself when the root node first registers, which is why the root
+  # node must be up before this runs.
+  #
+  # Never edit a migration that has already been applied - Flyway checksums them.
+  # Add a new V<n>__*.sql file instead.
+  V1__symds_identity_init_config.sql: |
+    ------------------------------------------------------------------------------
+    -- Node Groups
+    ------------------------------------------------------------------------------
+    insert into sym_node_group (node_group_id, description) values ('identity', 'identity node');
+
+    ------------------------------------------------------------------------------
+    -- Node Group Links
+    -- P = oracle pushes to identity, W = identity waits for oracle to pull from it
+    ------------------------------------------------------------------------------
+    insert into sym_node_group_link (source_node_group_id, target_node_group_id, data_event_action) values ('oracle', 'identity', 'P');
+    insert into sym_node_group_link (source_node_group_id, target_node_group_id, data_event_action) values ('identity', 'oracle', 'W');
+
+    ------------------------------------------------------------------------------
+    -- Routers
+    -- target_schema_name is where the data lands on the other side.
+    ------------------------------------------------------------------------------
+    insert into sym_router (router_id,source_node_group_id,target_node_group_id,target_schema_name,router_type,create_time,last_update_time)
+    values('oracle_2_identity', 'oracle', 'identity', 'symds_identity', 'default',current_timestamp, current_timestamp);
+
+    insert into sym_router (router_id,source_node_group_id,target_node_group_id,target_schema_name,router_type,create_time,last_update_time)
+    values('identity_2_oracle', 'identity', 'oracle', 'IDENTITY', 'default',current_timestamp, current_timestamp);
+
+    ------------------------------------------------------------------------------
+    -- Channels
+    ------------------------------------------------------------------------------
+    insert into sym_channel (channel_id, processing_order, max_batch_size, enabled, description)
+    values('identity', 5, 100000, 1, 'identity channel');
+
+    ------------------------------------------------------------------------------
+    -- Triggers
+    -- source_schema_name lists both sides' schemas because this one config row is
+    -- replicated to every node, and each node matches its own schema from the list.
+    ------------------------------------------------------------------------------
+    insert into sym_trigger (trigger_id, source_schema_name,source_table_name,channel_id,last_update_time,create_time)
+    values('identity_ora_trigger', 'IDENTITY,symds_identity','IDENTITY','identity',current_timestamp,current_timestamp);
+
+    ------------------------------------------------------------------------------
+    -- Trigger Routers
+    -- Both directions, so the IDENTITY table syncs Oracle <-> Postgres.
+    ------------------------------------------------------------------------------
+    insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
+    values('identity_ora_trigger','oracle_2_identity',100,current_timestamp,current_timestamp);
+
+    insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
+    values('identity_ora_trigger','identity_2_oracle',100,current_timestamp,current_timestamp);

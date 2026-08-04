@@ -29,27 +29,62 @@ echo "\n=== Create Postgres DB  ===\n"
 
 kubectl apply -f k8s/postgres-cluster.yaml
 
-echo "\n=== Apply the SymDs configs  ===\n"
-
-kubectl apply -f k8s/symds-identity-ora-engine-configmap.yaml
-kubectl apply -f k8s/symds-identity-pg-engine-configmap.yaml
-kubectl apply -f k8s/symds-identity-ora-deployment.yaml
-
 echo "\n=== Waiting for Oracle pods to be up... ===\n"
 
 kubectl wait --for=condition=Ready pod/identity-ora --timeout=300s
 
 echo "\n=== Waiting for Oracle to accept connections... ===\n"
 
+# Pod Ready only means the container started. Probing as the APP_USER is the better
+# signal: the image creates that user at the very end of its initialisation.
+tries=0
 while :; do
-  if probe=$(echo "SELECT 1 FROM dual;" | kubectl exec -i identity-ora -- sqlplus -S -L "system/identity@//localhost:1521/FREEPDB1" 2>&1); then
+  if probe=$(echo "SELECT 1 FROM dual;" | kubectl exec -i identity-ora -- sqlplus -S -L "identity/identity@//localhost:1521/FREEPDB1" 2>&1); then
     echo "OK"
     break
   fi
-  sleep 1
+  tries=$((tries + 1))
+  if [ "$tries" -gt 60 ]; then
+    echo "\nOracle did not become ready in time. Last error was:" >&2
+    echo "$probe" >&2
+    exit 1
+  fi
+  printf '.'
+  sleep 5
 done
 
 echo "\n=== Seed the Oracle DB  ===\n"
 
 ./seed-oracle.sh
 
+echo "\n=== Apply the SymDs secret, configmaps and services  ===\n"
+
+kubectl apply -f k8s/symds-secret.yaml
+kubectl apply -f k8s/symds-flyway-configmap.yaml
+kubectl apply -f k8s/symds-identity-ora-engine-configmap.yaml
+kubectl apply -f k8s/symds-identity-pg-engine-configmap.yaml
+kubectl apply -f k8s/symds-oracle-service.yaml
+kubectl apply -f k8s/symds-identity-service.yaml
+
+echo "\n=== Start the SymDs root node (oracle-000)  ===\n"
+
+# The root node MUST be up before the client node: it creates the sym_* tables that
+# the client's Flyway migrations populate, and it registers the oracle node group
+# that those migrations reference.
+kubectl apply -f k8s/symds-oracle-deployment.yaml
+kubectl rollout status deploy/symds-oracle --timeout=300s
+
+echo "\n=== Waiting for the Postgres cluster to be ready  ===\n"
+
+kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=identity-pg --timeout=300s
+
+echo "\n=== Start the SymDs client node (identity-001)  ===\n"
+
+# Registers with oracle-000 and receives its initial load automatically
+# (auto.registration / auto.reload are set on the root node).
+kubectl apply -f k8s/symds-identity-deployment.yaml
+kubectl rollout status deploy/symds-identity --timeout=300s
+
+echo "\n=== Done ===\n"
+echo "Replication should appear within ~30s. Check it with:"
+echo "  kubectl exec -it identity-pg-1 -- psql -U postgres -d identity -c 'select * from symds_identity.identity;'"

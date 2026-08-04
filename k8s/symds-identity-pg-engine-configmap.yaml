@@ -9,8 +9,10 @@ data:
 
     db.driver=org.postgresql.Driver
     db.url=jdbc:postgresql://identity-pg-rw:5432/identity?currentSchema=symds_identity&stringtype=unspecified
-    db.user=identity
-    db.password=identity
+    # CloudNativePG generates a random password for the identity user, so these
+    # have to come from the identity-pg-app secret via the deployment's env.
+    db.user=$(SYMDS_IDENTITY_DB_USERNAME)
+    db.password=$(SYMDS_IDENTITY_DB_PASSWORD)
     db.validation.query=select 1
 
     registration.url=http://symds-oracle:31415/sync/oracle-000
@@ -18,17 +20,15 @@ data:
     group.id=identity
     external.id=001
 
-    # How to run routing (in millis), which puts changes into batches.
+    # How often to run routing (in millis), which puts changes into batches.
     job.routing.period.time.ms=5000
 
     # How often to run push (in millis), which sends changes to other nodes.
     job.push.period.time.ms=10000
 
-    #How often to run pull (in millis), which receives changes from other nodes.
+    # How often to run pull (in millis), which receives changes from other nodes.
     job.pull.period.time.ms=10000
 
-    # Automatically register new nodes when they request it.
-    # If this is false, accept the registration requests using "symadmin open-registration" command.
-    auto.registration=true
-    auto.reload=true
+    # auto.registration and auto.reload are registration-server parameters and are
+    # set on oracle-000. This node is a client, so they would have no effect here.
 

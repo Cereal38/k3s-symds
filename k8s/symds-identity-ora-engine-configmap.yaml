@@ -8,11 +8,14 @@ data:
     engine.name=oracle-000
 
     db.driver=oracle.jdbc.driver.OracleDriver
-    db.url=jdbc:oracle:thin:@sitedbpreprod.ill.fr:1521:site
-    db.user=identity
-    db.password=identity
+    # Service-name form (@//host:port/service), not the SID form used against the
+    # real cluster: FREEPDB1 is a PDB service, not a SID.
+    db.url=jdbc:oracle:thin:@//oracle-service:1521/FREEPDB1
+    db.user=$(SYMDS_ORACLE_DB_USERNAME)
+    db.password=$(SYMDS_ORACLE_DB_PASSWORD)
     db.validation.query=select 1 from dual
 
+    # Blank registration.url marks this node as the registration server (root node).
     registration.url=
     sync.url=http://symds-oracle:31415/sync/oracle-000
     group.id=oracle
@@ -23,8 +26,8 @@ data:
     create.table.without.foreign.keys=true
     #initial.load.before.sql=call public.before_initial_load()
     #initial.load.after.sql=call public.after_initial_load()
-    
-    # How to run routing (in millis), which puts changes into batches.
+
+    # How often to run routing (in millis), which puts changes into batches.
     job.routing.period.time.ms=5000
 
     # How often to run push (in millis), which sends changes to other nodes.

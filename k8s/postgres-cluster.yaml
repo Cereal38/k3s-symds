@@ -16,4 +16,9 @@ spec:
       database: identity
       owner: identity
 
+      # The engine connects with currentSchema=symds_identity, which selects a schema
+      # but never creates it. Without this the sym_* tables cannot be created.
+      postInitApplicationSQL:
+        - CREATE SCHEMA IF NOT EXISTS symds_identity AUTHORIZATION identity;
+
   enableSuperuserAccess: true

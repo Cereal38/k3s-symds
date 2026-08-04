@@ -4,7 +4,9 @@
 
 set -e
 
-ORACLE_CONN="system/identity@//localhost:1521/FREEPDB1"
+# The APP_USER created by the oracle-free image (see up.sh). The table has to be
+# owned by this user, because it is the schema SymmetricDS captures from.
+ORACLE_CONN="identity/identity@//localhost:1521/FREEPDB1"
 
 kubectl exec -i identity-ora -- sqlplus -S -L "$ORACLE_CONN" <<'SQL'
 -- Make sqlplus return a non-zero exit code so `set -e` actually catches failures.

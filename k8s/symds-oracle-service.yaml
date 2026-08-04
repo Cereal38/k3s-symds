@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: symds-oracle
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: symds-oracle
+  ports:
+    - port: 31415
+      targetPort: 31415
