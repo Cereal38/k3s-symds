@@ -37,3 +37,12 @@ echo "\n=== Create Postgres DB  ===\n"
 
 kubectl apply -f k8s/postgres-cluster.yaml
 
+echo "\n=== Create a namespace for SymDs  ===\n"
+
+kubectl create namespace symds
+
+echo "\n=== Apply the SymDs engine configmap  ===\n"
+
+kubectl -n symds apply -f k8s/symds-identity-engine-configmap.yaml
+
+
