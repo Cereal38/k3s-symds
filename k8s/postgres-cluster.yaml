@@ -1,16 +1,15 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-cluster
+  name: identity-db
   namespace: postgres-db
 spec:
-  instances: 3
+  instances: 1
 
   imageName: ghcr.io/cloudnative-pg/postgresql:15
 
   storage:
     size: 1Gi
-    storageClass: csi-rbd-sc
 
   bootstrap:
     initdb:
@@ -18,13 +17,3 @@ spec:
       owner: identity
 
   enableSuperuserAccess: true
-  managed:
-    services:
-      disabledDefaultServices: [ "ro", "r" ]
-      additional:
-        - selectorType: rw
-          serviceTemplate:
-            metadata:
-              name: postgres-cluster-db-rw-lb
-            spec:
-              type: LoadBalancer
