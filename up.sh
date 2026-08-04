@@ -34,4 +34,22 @@ echo "\n=== Apply the SymDs engine configmaps  ===\n"
 kubectl apply -f k8s/symds-identity-ora-engine-configmap.yaml
 kubectl apply -f k8s/symds-identity-pg-engine-configmap.yaml
 
+echo "\n=== Waiting for Oracle pods to be up... ===\n"
+
+
+kubectl wait --for=condition=Ready pod/identity-ora --timeout=300s
+
+echo "\n=== Waiting for Oracle to accept connections... ===\n"
+
+while :; do
+  if probe=$(echo "SELECT 1 FROM dual;" | kubectl exec -i identity-ora -- sqlplus -S -L "system/identity@//localhost:1521/FREEPDB1" 2>&1); then
+    echo "OK"
+    break
+  fi
+  sleep 1
+done
+
+echo "\n=== Seed the Oracle DB  ===\n"
+
+./seed-oracle.sh
 
