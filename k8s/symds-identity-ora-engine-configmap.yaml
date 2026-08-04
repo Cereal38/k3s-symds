@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: identity-ora-engine-config
+  namespace: default
+data:
+  oracle-000.properties: |
+    engine.name=oracle-000
+
+    db.driver=oracle.jdbc.driver.OracleDriver
+    db.url=jdbc:oracle:thin:@sitedbpreprod.ill.fr:1521:site
+    db.user=identity
+    db.password=identity
+    db.validation.query=select 1 from dual
+
+    registration.url=
+    sync.url=http://symds-oracle:31415/sync/oracle-000
+    group.id=oracle
+    external.id=000
+
+    # When this node sends an initial load of data to another node, first send table create scripts.
+    initial.load.create.first=true
+    create.table.without.foreign.keys=true
+    #initial.load.before.sql=call public.before_initial_load()
+    #initial.load.after.sql=call public.after_initial_load()
+    
+    # How to run routing (in millis), which puts changes into batches.
+    job.routing.period.time.ms=5000
+
+    # How often to run push (in millis), which sends changes to other nodes.
+    job.push.period.time.ms=10000
+
+    #How often to run pull (in millis), which receives changes from other nodes.
+    job.pull.period.time.ms=10000
+
+    # Automatically register new nodes when they request it.
+    # If this is false, accept the registration requests using "symadmin open-registration" command.
+    auto.registration=true
+    auto.reload=true
+

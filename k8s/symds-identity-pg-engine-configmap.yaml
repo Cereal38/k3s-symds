@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: identity-engine-config
+  name: identity-pg-engine-config
   namespace: default
 data:
   identity-001.properties: |
@@ -9,8 +9,8 @@ data:
 
     db.driver=org.postgresql.Driver
     db.url=jdbc:postgresql://identity-pg-rw:5432/identity?currentSchema=symds_identity&stringtype=unspecified
-    db.user=$(SYMDS_IDENTITY_DB_USERNAME)
-    db.password=$(SYMDS_IDENTITY_DB_PASSWORD)
+    db.user=identity
+    db.password=identity
     db.validation.query=select 1
 
     registration.url=http://symds-oracle:31415/sync/oracle-000

@@ -9,7 +9,7 @@ k3d cluster create k3s-symds
 
 echo "\n=== Create Oracle DB  ===\n"
 
-kubectl run identity-ora --image=gvenzl/oracle-free:latest --env="ORACLE_PASSWORD=identity" --port=1521
+kubectl run identity-ora --image=gvenzl/oracle-free:latest --env="ORACLE_PASSWORD=identity" --env="APP_USER=identity" --env="APP_USER_PASSWORD=identity" --port=1521
 
 echo "\n=== Expose Oracle DB pod  ===\n"
 
@@ -29,8 +29,9 @@ echo "\n=== Create Postgres DB  ===\n"
 
 kubectl apply -f k8s/postgres-cluster.yaml
 
-echo "\n=== Apply the SymDs engine configmap  ===\n"
+echo "\n=== Apply the SymDs engine configmaps  ===\n"
 
-kubectl apply -f k8s/symds-identity-engine-configmap.yaml
+kubectl apply -f k8s/symds-identity-ora-engine-configmap.yaml
+kubectl apply -f k8s/symds-identity-pg-engine-configmap.yaml
 
 
