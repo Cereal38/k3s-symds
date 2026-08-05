@@ -32,7 +32,7 @@ data:
     values('oracle_2_identity', 'oracle', 'identity', 'symds_identity', 'default',current_timestamp, current_timestamp);
 
     insert into sym_router (router_id,source_node_group_id,target_node_group_id,target_schema_name,router_type,create_time,last_update_time)
-    values('identity_2_oracle', 'identity', 'oracle', 'IDENTITY', 'default',current_timestamp, current_timestamp);
+    values('identity_2_oracle', 'identity', 'oracle', 'ORA', 'default',current_timestamp, current_timestamp);
 
     ------------------------------------------------------------------------------
     -- Channels
