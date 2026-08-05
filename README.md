@@ -13,13 +13,13 @@ Insert a new identity into Oracle:
 
 ```shell
 # Insert the new identity
-printf "insert into identity (first_name,last_name,birth_date) values ('Nikola','Tesla',DATE '1856-07-10');\ncommit;\n" | kubectl exec -i identity-ora -- sqlplus -S identity/identity@//localhost:1521/FREEPDB1
+printf "insert into identity (first_name,last_name,birth_date) values ('Nikola','Tesla',DATE '1856-07-10');\ncommit;\n" | kubectl exec -i oracle-db -- sqlplus -S ora/ora@//localhost:1521/FREEPDB1
 
 # Select all identities
-kubectl exec -i identity-ora -- sqlplus -S "identity/identity@//localhost:1521/FREEPDB1" <<< "SELECT * FROM identity;"
+kubectl exec -i oracle-db -- sqlplus -S "ora/ora@//localhost:1521/FREEPDB1" <<< "SELECT * FROM identity;"
 
 # Delete the new identity
-printf "delete from identity where last_name = 'Tesla';\ncommit;\n" | kubectl exec -i identity-ora -- sqlplus -S identity/identity@//localhost:1521/FREEPDB1
+printf "delete from identity where last_name = 'Tesla';\ncommit;\n" | kubectl exec -i oracle-db -- sqlplus -S ora/ora@//localhost:1521/FREEPDB1
 ```
 
 Insert a new identity into Postgres:

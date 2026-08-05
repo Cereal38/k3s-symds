@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: identity-ora-engine-config
+  name: oracle-engine-config
   namespace: default
 data:
   oracle-000.properties: |

@@ -74,5 +74,5 @@ spec:
       volumes:
         - name: engine-config
           configMap:
-            name: identity-ora-engine-config
+            name: oracle-engine-config
 

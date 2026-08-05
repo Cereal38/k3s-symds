@@ -9,12 +9,12 @@ k3d cluster create k3s-symds
 
 echo "\n=== Create Oracle DB  ===\n"
 
-kubectl run identity-ora --image=gvenzl/oracle-free:latest --env="ORACLE_PASSWORD=identity" --env="APP_USER=identity" --env="APP_USER_PASSWORD=identity" --port=1521
+kubectl run oracle-db --image=gvenzl/oracle-free:latest --env="ORACLE_PASSWORD=ora" --env="APP_USER=ora" --env="APP_USER_PASSWORD=ora" --port=1521
 
 echo "\n=== Expose Oracle DB pod  ===\n"
 
-# To connect to the Oracle DB run this commande: `kubectl exec -it identity-ora -- sqlplus system/identity@//localhost:1521/FREEPDB1`
-kubectl expose pod identity-ora --port=1521 --target-port=1521 --name=oracle-service
+# To connect to the Oracle DB run this commande: `kubectl exec -it oracle-db -- sqlplus system/ora@//localhost:1521/FREEPDB1`
+kubectl expose pod oracle-db --port=1521 --target-port=1521 --name=oracle-service
 
 echo "\n=== Creating CNPG namespace  ===\n"
 
@@ -31,17 +31,17 @@ kubectl apply -f k8s/postgres-cluster.yaml
 
 echo "\n=== Waiting for Oracle pods to be up... ===\n"
 
-kubectl wait --for=condition=Ready pod/identity-ora --timeout=300s
+kubectl wait --for=condition=Ready pod/oracle-db --timeout=300s
 
 echo "\n=== Waiting for Oracle to accept connections... ===\n"
 
 SECONDS=0
 while :; do
-  if probe=$(echo "SELECT 1 FROM dual;" | kubectl exec -i identity-ora -- sqlplus -S -L "identity/identity@//localhost:1521/FREEPDB1" 2>&1); then
-    printf '\r\033[KOk\n' "$SECONDS"
+  if probe=$(echo "SELECT 1 FROM dual;" | kubectl exec -i oracle-db -- sqlplus -S -L "ora/ora@//localhost:1521/FREEPDB1" 2>&1); then
+    printf '\r\033[KOk\n'
     break
   fi
-  printf '\r\033[KWaiting for DB… %ds'
+  printf '\r\033[KWaiting for DB…'
   sleep 1
 done
 
@@ -53,7 +53,7 @@ echo "\n=== Apply the SymDs secret, configmaps and services  ===\n"
 
 kubectl apply -f k8s/symds-secret.yaml
 kubectl apply -f k8s/symds-flyway-configmap.yaml
-kubectl apply -f k8s/symds-identity-ora-engine-configmap.yaml
+kubectl apply -f k8s/symds-oracle-engine-configmap.yaml
 kubectl apply -f k8s/symds-identity-pg-engine-configmap.yaml
 kubectl apply -f k8s/symds-oracle-service.yaml
 kubectl apply -f k8s/symds-identity-service.yaml
