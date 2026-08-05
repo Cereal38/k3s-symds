@@ -27,6 +27,8 @@ kubectl -n cnpg-system rollout status deploy/cnpg-controller-manager --timeout=1
 
 echo "\n=== Create Postgres DB  ===\n"
 
+# Must exist before the Cluster CR: CNPG only reads it during initdb bootstrap.
+kubectl apply -f k8s/identity-pg-app-secret.yaml
 kubectl apply -f k8s/postgres-cluster.yaml
 
 echo "\n=== Waiting for Oracle pods to be up... ===\n"
@@ -76,6 +78,16 @@ echo "\n=== Start the SymDs client node (identity-001)  ===\n"
 # (auto.registration / auto.reload are set on the root node).
 kubectl apply -f k8s/symds-identity-deployment.yaml
 kubectl rollout status deploy/symds-identity --timeout=300s
+
+echo "\n=== Port-forwarding Oracle and Postgres for local DB clients (e.g. DataGrip)  ===\n"
+
+# Runs in the background so it outlives this script. PIDs/logs go to .pf/ (gitignored)
+# so down.sh can find and kill them on teardown.
+mkdir -p .pf
+kubectl port-forward svc/oracle-service 1521:1521 > .pf/oracle.log 2>&1 &
+echo $! > .pf/oracle.pid
+kubectl port-forward svc/identity-pg-rw 5432:5432 > .pf/postgres.log 2>&1 &
+echo $! > .pf/postgres.pid
 
 echo "\n=== Done ===\n"
 echo "Replication should appear within ~30s. Check it with:"

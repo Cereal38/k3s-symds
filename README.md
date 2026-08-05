@@ -34,3 +34,20 @@ kubectl exec -it identity-pg-1 -- psql -U postgres -d identity -c 'select * from
 # Delete the new identity
 kubectl exec -i identity-pg-1 -- psql -U postgres -d identity -c "delete from symds_identity.identity where last_name = 'Descartes';"
 ```
+
+## Connect to databases
+
+The `up.sh` script automatically portforward the postgres and the oracle db. So it's possible to connect with tools like Datagrip.
+
+Oracle:
+- host: `localhost`
+- port: `1521`
+- service name: `FREEPDB1`
+- user: `ora`
+- password: `ora`
+
+Postgres:
+- host: `localhost`
+- port: `5432`
+- user: `identity`
+- password: `identity`

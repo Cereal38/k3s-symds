@@ -15,6 +15,10 @@ spec:
     initdb:
       database: identity
       owner: identity
+      # Fixes the app user's password to 'identity' (see k8s/identity-pg-app-secret.yaml)
+      # instead of letting CNPG generate a random one every cluster creation.
+      secret:
+        name: identity-pg-app
 
       # The engine connects with currentSchema=symds_identity, which selects a schema
       # but never creates it. Without this the sym_* tables cannot be created.
