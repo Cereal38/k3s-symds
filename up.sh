@@ -35,22 +35,14 @@ kubectl wait --for=condition=Ready pod/identity-ora --timeout=300s
 
 echo "\n=== Waiting for Oracle to accept connections... ===\n"
 
-# Pod Ready only means the container started. Probing as the APP_USER is the better
-# signal: the image creates that user at the very end of its initialisation.
-tries=0
+SECONDS=0
 while :; do
   if probe=$(echo "SELECT 1 FROM dual;" | kubectl exec -i identity-ora -- sqlplus -S -L "identity/identity@//localhost:1521/FREEPDB1" 2>&1); then
-    echo "OK"
+    printf '\r\033[KOk\n' "$SECONDS"
     break
   fi
-  tries=$((tries + 1))
-  if [ "$tries" -gt 60 ]; then
-    echo "\nOracle did not become ready in time. Last error was:" >&2
-    echo "$probe" >&2
-    exit 1
-  fi
-  printf '.'
-  sleep 5
+  printf '\r\033[KWaiting for DB… %ds'
+  sleep 1
 done
 
 echo "\n=== Seed the Oracle DB  ===\n"
