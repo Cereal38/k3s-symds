@@ -32,5 +32,5 @@ kubectl exec -i identity-pg-1 -- psql -U postgres -d identity -c "insert into sy
 kubectl exec -it identity-pg-1 -- psql -U postgres -d identity -c 'select * from symds_identity.identity;'
 
 # Delete the new identity
-kubectl exec -i identity-pg-1 -- psql -U postgres -d identity -c "delete from symds_identity.identity where last_name = 'Tesla';"
+kubectl exec -i identity-pg-1 -- psql -U postgres -d identity -c "delete from symds_identity.identity where last_name = 'Descartes';"
 ```

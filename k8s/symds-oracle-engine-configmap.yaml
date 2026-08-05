@@ -28,13 +28,13 @@ data:
     #initial.load.after.sql=call public.after_initial_load()
 
     # How often to run routing (in millis), which puts changes into batches.
-    job.routing.period.time.ms=5000
+    job.routing.period.time.ms=1000
 
     # How often to run push (in millis), which sends changes to other nodes.
-    job.push.period.time.ms=10000
+    job.push.period.time.ms=2000
 
     #How often to run pull (in millis), which receives changes from other nodes.
-    job.pull.period.time.ms=10000
+    job.pull.period.time.ms=2000
 
     # Automatically register new nodes when they request it.
     # If this is false, accept the registration requests using "symadmin open-registration" command.

@@ -21,13 +21,13 @@ data:
     external.id=001
 
     # How often to run routing (in millis), which puts changes into batches.
-    job.routing.period.time.ms=5000
+    job.routing.period.time.ms=1000
 
     # How often to run push (in millis), which sends changes to other nodes.
-    job.push.period.time.ms=10000
+    job.push.period.time.ms=2000
 
     # How often to run pull (in millis), which receives changes from other nodes.
-    job.pull.period.time.ms=10000
+    job.pull.period.time.ms=2000
 
     # auto.registration and auto.reload are registration-server parameters and are
     # set on oracle-000. This node is a client, so they would have no effect here.
