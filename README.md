@@ -51,3 +51,26 @@ Postgres:
 - port: `5432`
 - user: `identity`
 - password: `identity`
+
+## Apply modifications in the flyway configmap
+
+1. Update the `k8s/symds-flyway-configmap.yaml` file to add the desired migration
+2. Apply the new version of the file with `kubectl apply -f k8s/symds-flyway-configmap.yaml`
+3. Restart the deployment with `kubectl rollout restart deployment/symds-identity`
+
+If the migration adds a new table to sync (`CREATE TABLE` + `sym_trigger`/`sym_trigger_router` rows) and the `identity-001` node has already completed its initial registration, SymmetricDS won't retroactively create/load that table on Postgres on its own — `initial.load.create.first=true` only fires during a node's first registration. Send the schema, then request a reload for just that table:
+
+```shell
+# 1. Create the table on identity-001 (Postgres) if it doesn't exist yet there
+kubectl exec deploy/symds-oracle -c symmetricds -- /opt/symmetric-ds/bin/symadmin --engine oracle-000 send-schema -n 001 <TABLE_NAME>
+
+# 2. Push the existing rows
+kubectl exec deploy/symds-oracle -c symmetricds -- /opt/symmetric-ds/bin/symadmin --engine oracle-000 reload-table -n 001 <TABLE_NAME>
+```
+
+For a full re-sync of every table (e.g. disaster recovery, or re-registering a node from scratch), use instead (heavier):
+
+```sql
+update sym_node_security set initial_load_enabled = 1, initial_load_time = null where node_id = '001';
+commit;
+```
