@@ -47,10 +47,10 @@ Postgres:
 If the migration adds a new table to sync (`CREATE TABLE` + `sym_trigger`/`sym_trigger_router` rows) and the `identity-001` node has already completed its initial registration, SymmetricDS won't retroactively create/load that table on Postgres on its own — `initial.load.create.first=true` only fires during a node's first registration. Send the schema, then request a reload for just that table:
 
 ```shell
-# 1. Create the table on identity-001 (Postgres) if it doesn't exist yet there
+# 1. Create the table Postgres side
 kubectl exec deploy/symds-oracle -c symmetricds -- /opt/symmetric-ds/bin/symadmin --engine oracle-000 send-schema -n 001 <TABLE_NAME>
 
-# 2. Push the existing rows
+# 2. Synchronize existing rows
 kubectl exec deploy/symds-oracle -c symmetricds -- /opt/symmetric-ds/bin/symadmin --engine oracle-000 reload-table -n 001 <TABLE_NAME>
 ```
 
