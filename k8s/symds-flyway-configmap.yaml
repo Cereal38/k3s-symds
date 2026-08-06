@@ -57,3 +57,15 @@ data:
 
     insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
     values('identity_ora_trigger','identity_2_oracle',100,current_timestamp,current_timestamp);
+
+  V2__symds_type_document_identite.sql: |
+    insert into sym_trigger (trigger_id, source_schema_name,source_table_name,channel_id,last_update_time,create_time)
+    values('typedocid_ora_trigger', 'IDENTITY,symds_identity','TYPE_DOCUMENT_IDENTITE','identity',current_timestamp,current_timestamp);
+
+    -- ORACLE -> PG
+    insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
+    values('typedocid_ora_trigger','oracle_2_identity',100,current_timestamp,current_timestamp);
+
+    -- PG -> ORACLE
+    insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
+    values('typedocid_ora_trigger','identity_2_oracle',100,current_timestamp,current_timestamp);

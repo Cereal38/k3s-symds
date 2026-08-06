@@ -14,6 +14,7 @@ WHENEVER SQLERROR EXIT FAILURE
 
 BEGIN
   EXECUTE IMMEDIATE 'DROP TABLE identity PURGE';
+  EXECUTE IMMEDIATE 'DROP TABLE type_document_identite PURGE';
 EXCEPTION
   WHEN OTHERS THEN NULL; -- table did not exist yet
 END;
@@ -24,6 +25,14 @@ CREATE TABLE identity (
   first_name VARCHAR2(50) NOT NULL,
   last_name  VARCHAR2(50) NOT NULL,
   birth_date DATE         NOT NULL
+);
+
+create table type_document_identite (
+  type_doc_id_no NUMBER(5) not null,
+  type_doc_id_code VARCHAR2(20) not null,
+  type_doc_id_lib VARCHAR2(100) not null,
+  type_doc_id_lib_en VARCHAR2(100) not null,
+  type_doc_id_visible VARCHAR2(1) default 'Y'
 );
 
 -- Single-table INSERT ... SELECT, not INSERT ALL: in a multitable insert Oracle
@@ -40,6 +49,15 @@ SELECT 'Grace',    'Hopper',   DATE '1906-12-09' FROM dual UNION ALL
 SELECT 'Niels',    'Bohr',     DATE '1885-10-07' FROM dual UNION ALL
 SELECT 'Emmy',     'Noether',  DATE '1882-03-23' FROM dual UNION ALL
 SELECT 'Blaise',   'Pascal',   DATE '1623-06-19' FROM dual;
+
+INSERT INTO type_document_identite (type_doc_id_no, type_doc_id_code, type_doc_id_lib, type_doc_id_lib_en, type_doc_id_visible) values
+(1, 'CNI', 'Carte nationale d''identité', 'National identity card', 'Y');
+
+INSERT INTO type_document_identite (type_doc_id_no, type_doc_id_code, type_doc_id_lib, type_doc_id_lib_en, type_doc_id_visible) values
+(2, 'PASSPORT', 'Passport', 'Passport', 'Y');
+
+INSERT INTO type_document_identite (type_doc_id_no, type_doc_id_code, type_doc_id_lib, type_doc_id_lib_en, type_doc_id_visible) values
+(3, 'VISA', 'Visa', 'Visa', 'Y');
 
 COMMIT;
 
