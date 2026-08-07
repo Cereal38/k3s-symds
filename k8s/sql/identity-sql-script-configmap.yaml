@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: identity-sql-script
+  namespace: default
+data:
+  00_setup-user-config.sql: |
+    DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'identity2') THEN
+          CREATE ROLE identity2 LOGIN PASSWORD 'identity2';
+        END IF;
+      END
+    $$;
+  
+    CREATE SCHEMA IF NOT EXISTS identity2 AUTHORIZATION identity2;
+
+    GRANT CONNECT ON DATABASE identity TO identity2;
+    GRANT USAGE, CREATE ON SCHEMA identity2 TO identity2;
+    GRANT USAGE ON SCHEMA symds_identity TO identity2;
+    GRANT SELECT ON ALL TABLES IN SCHEMA symds_identity TO identity2;
+    GRANT TRIGGER ON ALL TABLES IN SCHEMA symds_identity TO identity2;
+    ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT SELECT ON TABLES TO identity2;
+    ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT USAGE, SELECT ON SEQUENCES TO identity2;
+    ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT TRIGGER ON TABLES TO identity2;
