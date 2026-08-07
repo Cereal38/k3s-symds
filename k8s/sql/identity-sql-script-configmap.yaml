@@ -4,7 +4,7 @@ metadata:
   name: identity-sql-script
   namespace: default
 data:
-  00_setup-user-config.sql: |
+  00_setup_user_config.sql: |
     DO $$
       BEGIN
         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'identity2') THEN
@@ -23,3 +23,56 @@ data:
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT SELECT ON TABLES TO identity2;
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT USAGE, SELECT ON SEQUENCES TO identity2;
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT TRIGGER ON TABLES TO identity2;
+
+  01_create_id_doc_type.sql: |
+    
+    create table if not exists identity2.id_doc_type
+    (
+        type_doc_id_no
+        numeric
+    (
+        5
+    ) PRIMARY KEY,
+        type_doc_id_code text NOT NULL,
+        type_doc_id_lib text NOT NULL,
+        type_doc_id_lib_en text NOT NULL,
+        type_doc_id_visible text NOT NULL DEFAULT 'Y'
+        );
+
+  02_setup_identity_triggers.sql: |
+
+    DROP TRIGGER IF EXISTS trg_sync_type_document_identite ON symds_identity.type_document_identite;
+    
+    CREATE OR REPLACE FUNCTION identity2.sync_type_document_identite()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+    IF
+    TG_OP = 'DELETE' THEN
+    DELETE
+    FROM identity2.id_doc_type
+    WHERE type_doc_id_no = OLD.type_doc_id_no;
+    RETURN OLD;
+    END IF;
+    
+    INSERT INTO identity2.id_doc_type (type_doc_id_no, type_doc_id_code, type_doc_id_lib, type_doc_id_lib_en,
+                                       type_doc_id_visible)
+    VALUES (NEW.type_doc_id_no, NEW.type_doc_id_code, NEW.type_doc_id_lib, NEW.type_doc_id_lib_en,
+            NEW.type_doc_id_visible) ON CONFLICT (type_doc_id_no) DO
+    UPDATE
+        SET type_doc_id_code = EXCLUDED.type_doc_id_code,
+        type_doc_id_lib = EXCLUDED.type_doc_id_lib,
+        type_doc_id_lib_en = EXCLUDED.type_doc_id_lib_en,
+        type_doc_id_visible = EXCLUDED.type_doc_id_visible;
+    
+    RETURN NEW;
+    END;
+    $$;
+    
+    CREATE TRIGGER trg_sync_type_document_identite
+        AFTER INSERT OR
+    UPDATE OR
+    DELETE
+    ON symds_identity.type_document_identite
+        FOR EACH ROW EXECUTE FUNCTION identity2.sync_type_document_identite();
