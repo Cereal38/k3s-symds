@@ -27,7 +27,17 @@ data:
 
     GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA identity2 TO identity;
     GRANT TRIGGER ON ALL TABLES IN SCHEMA identity2 TO identity;
-  
+
+    GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA symds_identity TO identity2;
+    
+    GRANT USAGE ON SCHEMA symds_identity TO identity2;
+    
+    GRANT SELECT, INSERT, UPDATE, DELETE ON symds_identity.type_document_identite TO identity2;
+    -- what the sym capture trigger touches
+    GRANT INSERT ON symds_identity.sym_data TO identity2;
+    GRANT USAGE ON SEQUENCE symds_identity.sym_data_data_id_seq TO identity2;
+    GRANT EXECUTE ON FUNCTION symds_identity.sym_node_disabled() TO identity2;
+
 
   01_create_id_doc_type.sql: |
     
@@ -58,6 +68,21 @@ data:
     SET search_path = identity2, pg_catalog
     AS $$
     BEGIN
+    
+    IF coalesce(current_setting('symds.sync_in_progress', true), 'off') = 'on' THEN
+        RETURN NEW;
+    END IF;
+    
+    IF EXISTS (
+        SELECT 1
+        FROM identity2.id_doc_type
+        WHERE type_doc_id_no = NEW.type_doc_id_no
+    ) THEN
+        RETURN NEW;
+    END IF;
+
+    PERFORM set_config('symds.sync_in_progress', 'on', true);
+    
     IF
     TG_OP = 'DELETE' THEN
     DELETE
@@ -76,6 +101,8 @@ data:
         type_doc_id_lib_en = EXCLUDED.type_doc_id_lib_en,
         type_doc_id_visible = EXCLUDED.type_doc_id_visible;
     
+    PERFORM set_config('symds.sync_in_progress', 'off', true);
+    
     RETURN NEW;
     END;
     $$;
@@ -89,3 +116,62 @@ data:
     DELETE
     ON symds_identity.type_document_identite
         FOR EACH ROW EXECUTE FUNCTION identity2.sync_type_document_identite();
+
+  03_setup_identity_reverse_triggers.sql: |
+  
+    -- TODO: MISSING UPDATE AND DELETE
+    DROP TRIGGER IF EXISTS trg_sync_id_doc_type ON identity2.id_doc_type;
+    
+    CREATE OR REPLACE FUNCTION identity2.sync_id_doc_type()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = identity2, pg_catalog
+    AS $$
+    BEGIN
+    /*
+    * Loop guard: the peer trigger sets this flag while it is
+    * propagating a row, so we must not propagate it back.
+    */
+    IF coalesce(current_setting('symds.sync_in_progress', true), 'off') = 'on' THEN
+        RETURN NEW;
+    END IF;
+    
+    IF EXISTS (
+      SELECT 1
+      FROM symds_identity.type_document_identite
+      WHERE type_doc_id_no = NEW.type_doc_id_no
+    ) THEN
+        RETURN NEW;
+    END IF;
+    
+    PERFORM set_config('symds.sync_in_progress', 'on', true);   -- true = transaction-local
+    
+    INSERT INTO symds_identity.type_document_identite (
+    type_doc_id_no,
+    type_doc_id_code,
+    type_doc_id_lib,
+    type_doc_id_lib_en,
+    type_doc_id_visible
+    )
+    VALUES (
+    NEW.type_doc_id_no,
+    NEW.type_doc_id_code,
+    NEW.type_doc_id_lib,
+    NEW.type_doc_id_lib_en,
+    NEW.type_doc_id_visible
+    );
+    
+    PERFORM set_config('symds.sync_in_progress', 'off', true);
+    
+    RETURN NEW;
+    END;
+    $$;
+    
+    ALTER FUNCTION identity2.sync_id_doc_type() OWNER TO identity2;
+    
+    CREATE TRIGGER trg_sync_id_doc_type
+    AFTER INSERT
+    ON identity2.id_doc_type
+    FOR EACH ROW
+    EXECUTE FUNCTION identity2.sync_id_doc_type();
