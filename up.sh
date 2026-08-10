@@ -76,7 +76,7 @@ echo "\n=== Start the SymDs client node (identity-001)  ===\n"
 
 # Registers with oracle-000 and receives its initial load automatically
 # (auto.registration / auto.reload are set on the root node).
-kubectl apply -f k8s/kubectl applsymds-identity-deployment.yaml
+kubectl apply -f k8s/symds/symds-identity-deployment.yaml
 kubectl rollout status deploy/symds-identity --timeout=300s
 
 echo "\n=== Port-forwarding Oracle and Postgres for local DB clients (e.g. DataGrip)  ===\n"
