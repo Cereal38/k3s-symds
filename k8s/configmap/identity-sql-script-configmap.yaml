@@ -16,6 +16,7 @@ data:
     CREATE SCHEMA IF NOT EXISTS identity2 AUTHORIZATION identity2;
 
     GRANT CONNECT ON DATABASE identity TO identity2;
+    
     GRANT USAGE, CREATE ON SCHEMA identity2 TO identity2;
     GRANT USAGE ON SCHEMA symds_identity TO identity2;
     GRANT SELECT ON ALL TABLES IN SCHEMA symds_identity TO identity2;
@@ -23,6 +24,10 @@ data:
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT SELECT ON TABLES TO identity2;
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT USAGE, SELECT ON SEQUENCES TO identity2;
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT TRIGGER ON TABLES TO identity2;
+
+    GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA identity2 TO identity;
+    GRANT TRIGGER ON ALL TABLES IN SCHEMA identity2 TO identity;
+  
 
   01_create_id_doc_type.sql: |
     
@@ -39,6 +44,7 @@ data:
         type_doc_id_visible text NOT NULL DEFAULT 'Y'
         );
         
+    ALTER TABLE identity2.id_doc_type OWNER TO identity2;
     --GRANT INSERT ON ALL TABLES IN SCHEMA identity2 TO symds_identity;
 
   02_setup_identity_triggers.sql: |
@@ -48,6 +54,8 @@ data:
     CREATE OR REPLACE FUNCTION identity2.sync_type_document_identite()
     RETURNS trigger
     LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = identity2, pg_catalog
     AS $$
     BEGIN
     IF
@@ -71,6 +79,9 @@ data:
     RETURN NEW;
     END;
     $$;
+
+    ALTER FUNCTION identity2.sync_type_document_identite()
+        OWNER TO identity2;
     
     CREATE TRIGGER trg_sync_type_document_identite
         AFTER INSERT OR
