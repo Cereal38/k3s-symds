@@ -118,11 +118,12 @@ data:
         FOR EACH ROW EXECUTE FUNCTION identity2.sync_type_document_identite();
 
   03_setup_identity_reverse_triggers.sql: |
-  
+    
     -- TODO: MISSING UPDATE AND DELETE
     DROP TRIGGER IF EXISTS trg_sync_id_doc_type ON identity2.id_doc_type;
     
-    CREATE OR REPLACE FUNCTION identity2.sync_id_doc_type()
+    CREATE
+    OR REPLACE FUNCTION identity2.sync_id_doc_type()
     RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -133,11 +134,13 @@ data:
     * Loop guard: the peer trigger sets this flag while it is
     * propagating a row, so we must not propagate it back.
     */
-    IF coalesce(current_setting('symds.sync_in_progress', true), 'off') = 'on' THEN
+    IF
+    coalesce(current_setting('symds.sync_in_progress', true), 'off') = 'on' THEN
         RETURN NEW;
     END IF;
     
-    IF EXISTS (
+    IF
+    EXISTS (
       SELECT 1
       FROM symds_identity.type_document_identite
       WHERE type_doc_id_no = NEW.type_doc_id_no
@@ -145,24 +148,35 @@ data:
         RETURN NEW;
     END IF;
     
-    PERFORM set_config('symds.sync_in_progress', 'on', true);   -- true = transaction-local
+    PERFORM
+    set_config('symds.sync_in_progress', 'on', true);   -- true = transaction-local
+        
+    IF
+    TG_OP = 'DELETE' THEN
+    DELETE
+    FROM symds_identity.type_document_identite
+    WHERE type_doc_id_no = OLD.type_doc_id_no;
+    RETURN OLD;
+    END IF;
     
-    INSERT INTO symds_identity.type_document_identite (
-    type_doc_id_no,
-    type_doc_id_code,
-    type_doc_id_lib,
-    type_doc_id_lib_en,
-    type_doc_id_visible
-    )
-    VALUES (
-    NEW.type_doc_id_no,
-    NEW.type_doc_id_code,
-    NEW.type_doc_id_lib,
-    NEW.type_doc_id_lib_en,
-    NEW.type_doc_id_visible
-    );
+    INSERT INTO symds_identity.type_document_identite (type_doc_id_no,
+                                                       type_doc_id_code,
+                                                       type_doc_id_lib,
+                                                       type_doc_id_lib_en,
+                                                       type_doc_id_visible)
+    VALUES (NEW.type_doc_id_no,
+            NEW.type_doc_id_code,
+            NEW.type_doc_id_lib,
+            NEW.type_doc_id_lib_en,
+            NEW.type_doc_id_visible) ON CONFLICT (type_doc_id_no) DO
+    UPDATE
+        SET type_doc_id_code = EXCLUDED.type_doc_id_code,
+        type_doc_id_lib = EXCLUDED.type_doc_id_lib,
+        type_doc_id_lib_en = EXCLUDED.type_doc_id_lib_en,
+        type_doc_id_visible = EXCLUDED.type_doc_id_visible;
     
-    PERFORM set_config('symds.sync_in_progress', 'off', true);
+    PERFORM
+    set_config('symds.sync_in_progress', 'off', true);
     
     RETURN NEW;
     END;
@@ -171,7 +185,9 @@ data:
     ALTER FUNCTION identity2.sync_id_doc_type() OWNER TO identity2;
     
     CREATE TRIGGER trg_sync_id_doc_type
-    AFTER INSERT
-    ON identity2.id_doc_type
-    FOR EACH ROW
-    EXECUTE FUNCTION identity2.sync_id_doc_type();
+        AFTER INSERT OR
+        UPDATE OR
+        DELETE
+        ON identity2.id_doc_type
+        FOR EACH ROW
+        EXECUTE FUNCTION identity2.sync_id_doc_type();
