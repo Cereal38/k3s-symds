@@ -51,7 +51,7 @@ data:
 
   02_sync_id_document_type_symds_to_app.sql: |
 
-    DROP TRIGGER IF EXISTS trg_sync_type_document_identite ON symds_identity.type_document_identite;
+    DROP TRIGGER IF EXISTS trg_sync_id_document_type_symds_to_app ON symds_identity.id_document_type;
 
     CREATE
     OR REPLACE FUNCTION identity_app.sync_id_document_type_symds_to_app()
@@ -128,13 +128,13 @@ data:
         AFTER INSERT OR
     UPDATE OR
     DELETE
-    ON symds_identity.type_document_identite
+    ON symds_identity.id_document_type
         FOR EACH ROW
         EXECUTE FUNCTION identity_app.sync_id_document_type_symds_to_app();
 
   03_sync_id_document_type_app_to_symds.sql: |
 
-    DROP TRIGGER IF EXISTS trg_sync_id_document_type ON identity_app.id_document_type;
+    DROP TRIGGER IF EXISTS trg_sync_id_document_type_app_to_symds ON identity_app.id_document_type;
 
     CREATE
     OR REPLACE FUNCTION identity_app.sync_id_document_type_app_to_symds()
@@ -161,7 +161,7 @@ data:
         IF
     TG_OP = 'DELETE' THEN
     DELETE
-    FROM symds_identity.type_document_identite
+    FROM symds_identity.id_document_type
     WHERE id = OLD.id;
     
     PERFORM
@@ -171,7 +171,7 @@ data:
 
         IF
     TG_OP = 'UPDATE' THEN
-    UPDATE symds_identity.type_document_identite
+    UPDATE symds_identity.id_document_type
     SET id      = NEW.id,
         code    = NEW.code,
         label_fr     = NEW.label_fr,
@@ -180,7 +180,7 @@ data:
     
     IF
     NOT FOUND THEN
-                INSERT INTO symds_identity.type_document_identite (
+                INSERT INTO symds_identity.id_document_type (
                     id, code, label_fr,
                     label_en)
                 VALUES (NEW.id, NEW.code, NEW.label_fr,
@@ -193,7 +193,7 @@ data:
     END IF;
 
         -- TG_OP = 'INSERT'
-    INSERT INTO symds_identity.type_document_identite (id, code, label_fr,
+    INSERT INTO symds_identity.id_document_type (id, code, label_fr,
                                                        label_en)
     VALUES (NEW.id, NEW.code, NEW.label_fr,
             NEW.label_en);
