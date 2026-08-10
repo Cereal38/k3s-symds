@@ -28,8 +28,8 @@ kubectl -n cnpg-system rollout status deploy/cnpg-controller-manager --timeout=1
 echo "\n=== Create Postgres DB  ===\n"
 
 # Must exist before the Cluster CR: CNPG only reads it during initdb bootstrap.
-kubectl apply -f k8s/identity-pg-app-secret.yaml
-kubectl apply -f k8s/postgres-cluster.yaml
+kubectl apply -f k8s/secret/identity-pg-app-secret.yaml
+kubectl apply -f k8s/db/identity-db.yaml
 
 echo "\n=== Waiting for Oracle pods to be up... ===\n"
 
@@ -53,19 +53,19 @@ echo "\n=== Seed the Oracle DB  ===\n"
 
 echo "\n=== Apply the SymDs secret, configmaps and services  ===\n"
 
-kubectl apply -f k8s/symds-secret.yaml
-kubectl apply -f k8s/symds-flyway-configmap.yaml
-kubectl apply -f k8s/symds-oracle-engine-configmap.yaml
-kubectl apply -f k8s/symds-identity-pg-engine-configmap.yaml
-kubectl apply -f k8s/symds-oracle-service.yaml
-kubectl apply -f k8s/symds-identity-service.yaml
+kubectl apply -f k8s/secret/symds-secret.yaml
+kubectl apply -f k8s/symds/symds-flyway-configmap.yaml
+kubectl apply -f k8s/symds/symds-oracle-engine-configmap.yaml
+kubectl apply -f k8s/symds/symds-identity-pg-engine-configmap.yaml
+kubectl apply -f k8s/symds/symds-oracle-service.yaml
+kubectl apply -f k8s/symds/symds-identity-service.yaml
 
 echo "\n=== Start the SymDs root node (oracle-000)  ===\n"
 
 # The root node MUST be up before the client node: it creates the sym_* tables that
 # the client's Flyway migrations populate, and it registers the oracle node group
 # that those migrations reference.
-kubectl apply -f k8s/symds-oracle-deployment.yaml
+kubectl apply -f k8s/symds/symds-oracle-deployment.yaml
 kubectl rollout status deploy/symds-oracle --timeout=300s
 
 echo "\n=== Waiting for the Postgres cluster to be ready  ===\n"
@@ -80,7 +80,7 @@ echo "\n=== Start the SymDs client node (identity-001)  ===\n"
 
 # Registers with oracle-000 and receives its initial load automatically
 # (auto.registration / auto.reload are set on the root node).
-kubectl apply -f k8s/symds-identity-deployment.yaml
+kubectl apply -f k8s/kubectl applsymds-identity-deployment.yaml
 kubectl rollout status deploy/symds-identity --timeout=300s
 
 echo "\n=== Port-forwarding Oracle and Postgres for local DB clients (e.g. DataGrip)  ===\n"

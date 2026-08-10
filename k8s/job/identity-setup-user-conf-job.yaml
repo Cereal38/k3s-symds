@@ -42,7 +42,7 @@ spec:
             # The superuser, not the identity app user: the scripts run CREATE ROLE
             # and ALTER DEFAULT PRIVILEGES FOR ROLE identity, neither of which the
             # app user is allowed to do. Provided by enableSuperuserAccess on the
-            # CNPG cluster (see k8s/postgres-cluster.yaml).
+            # CNPG cluster (see k8s/db/identity-db.yaml).
             - name: PGUSER
               valueFrom:
                 secretKeyRef:
