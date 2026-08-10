@@ -5,6 +5,11 @@ metadata:
   namespace: default
 data:
   00_setup_user_config.sql: |
+    -- Create role and schema for postgres tables
+    -- All of this run as postgres superuser
+    -- It must be idempotent since it can run multiple times
+        
+    -- Create the role identity2
     DO $$
       BEGIN
         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'identity2') THEN
@@ -13,31 +18,20 @@ data:
       END
     $$;
   
+    -- Create schema identity2 and allow it to connect to the identity dabase
     CREATE SCHEMA IF NOT EXISTS identity2 AUTHORIZATION identity2;
-
     GRANT CONNECT ON DATABASE identity TO identity2;
     
-    GRANT USAGE, CREATE ON SCHEMA identity2 TO identity2;
+    -- Give access to identity2 to the symds schema (for everything created before this script)
     GRANT USAGE ON SCHEMA symds_identity TO identity2;
-    GRANT SELECT ON ALL TABLES IN SCHEMA symds_identity TO identity2;
-    GRANT TRIGGER ON ALL TABLES IN SCHEMA symds_identity TO identity2;
-    ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT SELECT ON TABLES TO identity2;
-    ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT USAGE, SELECT ON SEQUENCES TO identity2;
-    ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity GRANT TRIGGER ON TABLES TO identity2;
-
-    GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA identity2 TO identity;
-    GRANT TRIGGER ON ALL TABLES IN SCHEMA identity2 TO identity;
-
-    GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA symds_identity TO identity2;
-    
-    GRANT USAGE ON SCHEMA symds_identity TO identity2;
-    
-    GRANT SELECT, INSERT, UPDATE, DELETE ON symds_identity.type_document_identite TO identity2;
-    -- what the sym capture trigger touches
-    GRANT INSERT ON symds_identity.sym_data TO identity2;
-    GRANT USAGE ON SEQUENCE symds_identity.sym_data_data_id_seq TO identity2;
-    GRANT EXECUTE ON FUNCTION symds_identity.sym_node_disabled() TO identity2;
-
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA symds_identity TO identity2;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA symds_identity TO identity2;
+        
+    -- Give access to identity2 to the symds schema (for everything created after this script)
+    ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO identity2;
+    ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity
+        GRANT USAGE, SELECT ON SEQUENCES TO identity2;
 
   01_create_id_doc_type.sql: |
     
