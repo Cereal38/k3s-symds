@@ -38,6 +38,8 @@ data:
         type_doc_id_lib_en text NOT NULL,
         type_doc_id_visible text NOT NULL DEFAULT 'Y'
         );
+        
+    --GRANT INSERT ON ALL TABLES IN SCHEMA identity2 TO symds_identity;
 
   02_setup_identity_triggers.sql: |
 

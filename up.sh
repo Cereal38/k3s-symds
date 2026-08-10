@@ -72,9 +72,9 @@ echo "\n=== Waiting for the Postgres cluster to be ready  ===\n"
 
 kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=identity-pg --timeout=300s
 
-echo "\n=== Seed the Postgres DB ===\n"
+#echo "\n=== Seed the Postgres DB ===\n"
 
-./seed-pg.sh
+#./seed-pg.sh
 
 echo "\n=== Start the SymDs client node (identity-001)  ===\n"
 
