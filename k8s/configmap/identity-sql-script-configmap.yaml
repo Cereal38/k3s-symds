@@ -9,33 +9,33 @@ data:
     -- All of this run as postgres superuser
     -- It must be idempotent since it can run multiple times
         
-    -- Create the role identity2
+    -- Create the role identity_app
     DO $$
       BEGIN
-        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'identity2') THEN
-          CREATE ROLE identity2 LOGIN PASSWORD 'identity2';
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'identity_app') THEN
+          CREATE ROLE identity_app LOGIN PASSWORD 'identity_app';
         END IF;
       END
     $$;
   
-    -- Create schema identity2 and allow it to connect to the identity dabase
-    CREATE SCHEMA IF NOT EXISTS identity2 AUTHORIZATION identity2;
-    GRANT CONNECT ON DATABASE identity TO identity2;
+    -- Create schema identity_app and allow it to connect to the identity dabase
+    CREATE SCHEMA IF NOT EXISTS identity_app AUTHORIZATION identity_app;
+    GRANT CONNECT ON DATABASE identity TO identity_app;
     
-    -- Give access to identity2 to the symds schema (for everything created before this script)
-    GRANT USAGE ON SCHEMA symds_identity TO identity2;
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA symds_identity TO identity2;
-    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA symds_identity TO identity2;
+    -- Give access to identity_app to the symds schema (for everything created before this script)
+    GRANT USAGE ON SCHEMA symds_identity TO identity_app;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA symds_identity TO identity_app;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA symds_identity TO identity_app;
         
-    -- Give access to identity2 to the symds schema (for everything created after this script)
+    -- Give access to identity_app to the symds schema (for everything created after this script)
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO identity2;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO identity_app;
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity
-        GRANT USAGE, SELECT ON SEQUENCES TO identity2;
+        GRANT USAGE, SELECT ON SEQUENCES TO identity_app;
 
   01_create_id_doc_type.sql: |
     
-    create table if not exists identity2.id_doc_type
+    create table if not exists identity_app.id_doc_type
     (
         type_doc_id_no
         numeric
@@ -48,19 +48,18 @@ data:
         type_doc_id_visible text NOT NULL DEFAULT 'Y'
         );
         
-    ALTER TABLE identity2.id_doc_type OWNER TO identity2;
-    --GRANT INSERT ON ALL TABLES IN SCHEMA identity2 TO symds_identity;
+    ALTER TABLE identity_app.id_doc_type OWNER TO identity_app;
 
   02_setup_identity_triggers.sql: |
 
     DROP TRIGGER IF EXISTS trg_sync_type_document_identite ON symds_identity.type_document_identite;
 
     CREATE
-    OR REPLACE FUNCTION identity2.sync_type_document_identite()
+    OR REPLACE FUNCTION identity_app.sync_type_document_identite()
     RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
-    SET search_path = identity2, pg_catalog
+    SET search_path = identity_app, pg_catalog
     AS $$
     BEGIN
         /*
@@ -80,7 +79,7 @@ data:
         IF
     TG_OP = 'DELETE' THEN
     DELETE
-    FROM identity2.id_doc_type
+    FROM identity_app.id_doc_type
     WHERE type_doc_id_no = OLD.type_doc_id_no;
     
     PERFORM
@@ -90,7 +89,7 @@ data:
 
         IF
     TG_OP = 'UPDATE' THEN
-    UPDATE identity2.id_doc_type
+    UPDATE identity_app.id_doc_type
     SET type_doc_id_no      = NEW.type_doc_id_no,
         type_doc_id_code    = NEW.type_doc_id_code,
         type_doc_id_lib     = NEW.type_doc_id_lib,
@@ -100,7 +99,7 @@ data:
     
     IF
     NOT FOUND THEN
-                INSERT INTO identity2.id_doc_type (
+                INSERT INTO identity_app.id_doc_type (
                     type_doc_id_no, type_doc_id_code, type_doc_id_lib,
                     type_doc_id_lib_en, type_doc_id_visible)
                 VALUES (NEW.type_doc_id_no, NEW.type_doc_id_code, NEW.type_doc_id_lib,
@@ -113,7 +112,7 @@ data:
     END IF;
 
         -- TG_OP = 'INSERT'
-    INSERT INTO identity2.id_doc_type (type_doc_id_no, type_doc_id_code, type_doc_id_lib,
+    INSERT INTO identity_app.id_doc_type (type_doc_id_no, type_doc_id_code, type_doc_id_lib,
                                        type_doc_id_lib_en, type_doc_id_visible)
     VALUES (NEW.type_doc_id_no, NEW.type_doc_id_code, NEW.type_doc_id_lib,
             NEW.type_doc_id_lib_en, NEW.type_doc_id_visible);
@@ -124,8 +123,8 @@ data:
     END;
     $$;
 
-    ALTER FUNCTION identity2.sync_type_document_identite()
-        OWNER TO identity2;
+    ALTER FUNCTION identity_app.sync_type_document_identite()
+        OWNER TO identity_app;
 
     CREATE TRIGGER trg_sync_type_document_identite
         AFTER INSERT OR
@@ -133,18 +132,18 @@ data:
     DELETE
     ON symds_identity.type_document_identite
         FOR EACH ROW
-        EXECUTE FUNCTION identity2.sync_type_document_identite();
+        EXECUTE FUNCTION identity_app.sync_type_document_identite();
 
   03_setup_identity_reverse_triggers.sql: |
 
-    DROP TRIGGER IF EXISTS trg_sync_id_doc_type ON identity2.id_doc_type;
+    DROP TRIGGER IF EXISTS trg_sync_id_doc_type ON identity_app.id_doc_type;
 
     CREATE
-    OR REPLACE FUNCTION identity2.sync_id_doc_type()
+    OR REPLACE FUNCTION identity_app.sync_id_doc_type()
     RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
-    SET search_path = identity2, pg_catalog
+    SET search_path = identity_app, pg_catalog
     AS $$
     BEGIN
         /*
@@ -208,12 +207,12 @@ data:
     END;
     $$;
 
-    ALTER FUNCTION identity2.sync_id_doc_type() OWNER TO identity2;
+    ALTER FUNCTION identity_app.sync_id_doc_type() OWNER TO identity_app;
 
     CREATE TRIGGER trg_sync_id_doc_type
         AFTER INSERT OR
     UPDATE OR
     DELETE
-    ON identity2.id_doc_type
+    ON identity_app.id_doc_type
         FOR EACH ROW
-        EXECUTE FUNCTION identity2.sync_id_doc_type();
+        EXECUTE FUNCTION identity_app.sync_id_doc_type();
