@@ -54,7 +54,7 @@ data:
     DROP TRIGGER IF EXISTS trg_sync_type_document_identite ON symds_identity.type_document_identite;
 
     CREATE
-    OR REPLACE FUNCTION identity_app.sync_type_document_identite()
+    OR REPLACE FUNCTION identity_app.sync_id_document_type_symds_to_app()
     RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -121,23 +121,23 @@ data:
     END;
     $$;
 
-    ALTER FUNCTION identity_app.sync_type_document_identite()
+    ALTER FUNCTION identity_app.sync_id_document_type_symds_to_app()
         OWNER TO identity_app;
 
-    CREATE TRIGGER trg_sync_type_document_identite
+    CREATE TRIGGER trg_sync_id_document_type_symds_to_app
         AFTER INSERT OR
     UPDATE OR
     DELETE
     ON symds_identity.type_document_identite
         FOR EACH ROW
-        EXECUTE FUNCTION identity_app.sync_type_document_identite();
+        EXECUTE FUNCTION identity_app.sync_id_document_type_symds_to_app();
 
   03_sync_id_document_type_app_to_symds.sql: |
 
     DROP TRIGGER IF EXISTS trg_sync_id_document_type ON identity_app.id_document_type;
 
     CREATE
-    OR REPLACE FUNCTION identity_app.sync_id_document_type()
+    OR REPLACE FUNCTION identity_app.sync_id_document_type_app_to_symds()
     RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -204,12 +204,12 @@ data:
     END;
     $$;
 
-    ALTER FUNCTION identity_app.sync_id_document_type() OWNER TO identity_app;
+    ALTER FUNCTION identity_app.sync_id_document_type_app_to_symds() OWNER TO identity_app;
 
-    CREATE TRIGGER trg_sync_id_document_type
+    CREATE TRIGGER trg_sync_id_document_type_app_to_symds
         AFTER INSERT OR
     UPDATE OR
     DELETE
     ON identity_app.id_document_type
         FOR EACH ROW
-        EXECUTE FUNCTION identity_app.sync_id_document_type();
+        EXECUTE FUNCTION identity_app.sync_id_document_type_app_to_symds();
