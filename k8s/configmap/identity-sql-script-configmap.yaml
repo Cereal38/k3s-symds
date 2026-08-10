@@ -49,7 +49,7 @@ data:
         
     ALTER TABLE identity_app.id_document_type OWNER TO identity_app;
 
-  02_setup_identity_triggers.sql: |
+  02_sync_id_document_type_symds_to_app.sql: |
 
     DROP TRIGGER IF EXISTS trg_sync_type_document_identite ON symds_identity.type_document_identite;
 
@@ -132,7 +132,7 @@ data:
         FOR EACH ROW
         EXECUTE FUNCTION identity_app.sync_type_document_identite();
 
-  03_setup_identity_reverse_triggers.sql: |
+  03_sync_id_document_type_app_to_symds.sql: |
 
     DROP TRIGGER IF EXISTS trg_sync_id_document_type ON identity_app.id_document_type;
 
