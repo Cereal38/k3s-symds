@@ -14,7 +14,7 @@ WHENEVER SQLERROR EXIT FAILURE
 
 BEGIN
   EXECUTE IMMEDIATE 'DROP TABLE identity PURGE';
-  EXECUTE IMMEDIATE 'DROP TABLE type_document_identite PURGE';
+  EXECUTE IMMEDIATE 'DROP TABLE id_document_type PURGE';
 EXCEPTION
   WHEN OTHERS THEN NULL; -- table did not exist yet
 END;
@@ -34,36 +34,22 @@ create table id_document_type (
   label_en VARCHAR2(100) not null
 );
 
--- Single-table INSERT ... SELECT, not INSERT ALL: in a multitable insert Oracle
--- advances the identity sequence once per statement instead of once per row, so
--- every row would get ID=1 and collide on the primary key.
-INSERT INTO identity (first_name, last_name, birth_date)
-SELECT 'Marie',    'Curie',    DATE '1867-11-07' FROM dual UNION ALL
-SELECT 'Alan',     'Turing',   DATE '1912-06-23' FROM dual UNION ALL
-SELECT 'Ada',      'Lovelace', DATE '1815-12-10' FROM dual UNION ALL
-SELECT 'Louis',    'Pasteur',  DATE '1822-12-27' FROM dual UNION ALL
-SELECT 'Rosalind', 'Franklin', DATE '1920-07-25' FROM dual UNION ALL
-SELECT 'Henri',    'Poincare', DATE '1854-04-29' FROM dual UNION ALL
-SELECT 'Grace',    'Hopper',   DATE '1906-12-09' FROM dual UNION ALL
-SELECT 'Niels',    'Bohr',     DATE '1885-10-07' FROM dual UNION ALL
-SELECT 'Emmy',     'Noether',  DATE '1882-03-23' FROM dual UNION ALL
-SELECT 'Blaise',   'Pascal',   DATE '1623-06-19' FROM dual;
+INSERT INTO identity (first_name, last_name, birth_date) values ('Marie', 'Curie', DATE '1867-11-07');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Alan', 'Turing', DATE '1912-06-23');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Ada', 'Lovelace', DATE '1815-12-10');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Louis', 'Pasteur', DATE '1822-12-27');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Rosalind', 'Franklin', DATE '1920-07-25');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Henri', 'Poincare', DATE '1854-04-29');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Grace', 'Hopper', DATE '1906-12-09');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Niels', 'Bohr', DATE '1885-10-07');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Emmy', 'Noether', DATE '1882-03-23');
+INSERT INTO identity (first_name, last_name, birth_date) values ('Blaise', 'Pascal', DATE '1623-06-19');
 
-INSERT INTO id_document_type (id, code, label_fr, label_en) values
-(1, 'CNI', 'Carte nationale d''identité', 'National identity card');
-
-INSERT INTO id_document_type (id, code, label_fr, label_en) values
-(2, 'PASSPORT', 'Passport', 'Passport');
-
-INSERT INTO id_document_type (id, code, label_fr, label_en) values
-(3, 'VISA', 'Visa', 'Visa');
+INSERT INTO id_document_type (id, code, label_fr, label_en) values (1, 'CNI', 'Carte nationale d''identité', 'National identity card');
+INSERT INTO id_document_type (id, code, label_fr, label_en) values (2, 'PASSPORT', 'Passport', 'Passport');
+INSERT INTO id_document_type (id, code, label_fr, label_en) values (3, 'VISA', 'Visa', 'Visa');
 
 COMMIT;
-
-SET LINESIZE 120
-COLUMN first_name FORMAT A12
-COLUMN last_name  FORMAT A12
-SELECT id, first_name, last_name, TO_CHAR(birth_date, 'YYYY-MM-DD') AS birth_date FROM identity ORDER BY id;
 
 EXIT
 SQL
