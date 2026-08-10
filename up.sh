@@ -92,6 +92,12 @@ kubectl port-forward svc/oracle-service 1521:1521 > .pf/oracle.log 2>&1 &
 echo $! > .pf/oracle.pid
 kubectl port-forward svc/identity-pg-rw 5432:5432 > .pf/postgres.log 2>&1 &
 echo $! > .pf/postgres.pid
+echo "OK"
+
+echo "\n=== Create configmap and job for identity setup  ===\n"
+
+kubectl apply -f k8s/configmap/identity-sql-script-configmap.yaml
+kubectl apply -f k8s/job/identity-setup-user-conf-job.yaml
 
 echo "\n=== Done ===\n"
 echo "Replication should appear within ~30s. Check it with:"
