@@ -4,7 +4,6 @@ Run a k3s cluster with a Oracle db, a Postgres db (cnpg) and SymmetricDs. To try
 
 ## What is needed
 
-- At least 40gb of free disk space  
 - k3d command installed  
 
 ## Useful commands
@@ -60,3 +59,10 @@ For a full re-sync of every table (e.g. disaster recovery, or re-registering a n
 update sym_node_security set initial_load_enabled = 1, initial_load_time = null where node_id = '001';
 commit;
 ```
+
+## Synchronize Symds table and app table in the Postgres DB
+
+To synchronize Symds tables and app tables in Postgres, we use triggers. We define them in confimap files and run them using jobs.  
+In this app we have an example with the `id_document_type` table.  
+
+`PG identity_app.id_document_type` <- triggers -> `PG symds_identity.id_document_type` <- Symds -> `ORACLE id_document_type`
