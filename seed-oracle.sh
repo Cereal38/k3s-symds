@@ -27,12 +27,11 @@ CREATE TABLE identity (
   birth_date DATE         NOT NULL
 );
 
-create table type_document_identite (
-  type_doc_id_no NUMBER(5) not null,
-  type_doc_id_code VARCHAR2(20) not null,
-  type_doc_id_lib VARCHAR2(100) not null,
-  type_doc_id_lib_en VARCHAR2(100) not null,
-  type_doc_id_visible VARCHAR2(1) default 'Y'
+create table id_document_type (
+  id NUMBER(5) not null,
+  code VARCHAR2(20) not null,
+  label_fr VARCHAR2(100) not null,
+  label_en VARCHAR2(100) not null
 );
 
 -- Single-table INSERT ... SELECT, not INSERT ALL: in a multitable insert Oracle
@@ -50,14 +49,14 @@ SELECT 'Niels',    'Bohr',     DATE '1885-10-07' FROM dual UNION ALL
 SELECT 'Emmy',     'Noether',  DATE '1882-03-23' FROM dual UNION ALL
 SELECT 'Blaise',   'Pascal',   DATE '1623-06-19' FROM dual;
 
-INSERT INTO type_document_identite (type_doc_id_no, type_doc_id_code, type_doc_id_lib, type_doc_id_lib_en, type_doc_id_visible) values
-(1, 'CNI', 'Carte nationale d''identité', 'National identity card', 'Y');
+INSERT INTO id_document_type (id, code, label_fr, label_en) values
+(1, 'CNI', 'Carte nationale d''identité', 'National identity card');
 
-INSERT INTO type_document_identite (type_doc_id_no, type_doc_id_code, type_doc_id_lib, type_doc_id_lib_en, type_doc_id_visible) values
-(2, 'PASSPORT', 'Passport', 'Passport', 'Y');
+INSERT INTO id_document_type (id, code, label_fr, label_en) values
+(2, 'PASSPORT', 'Passport', 'Passport');
 
-INSERT INTO type_document_identite (type_doc_id_no, type_doc_id_code, type_doc_id_lib, type_doc_id_lib_en, type_doc_id_visible) values
-(3, 'VISA', 'Visa', 'Visa', 'Y');
+INSERT INTO id_document_type (id, code, label_fr, label_en) values
+(3, 'VISA', 'Visa', 'Visa');
 
 COMMIT;
 

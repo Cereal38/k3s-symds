@@ -33,22 +33,21 @@ data:
     ALTER DEFAULT PRIVILEGES FOR ROLE identity IN SCHEMA symds_identity
         GRANT USAGE, SELECT ON SEQUENCES TO identity_app;
 
-  01_create_id_doc_type.sql: |
+  01_create_id_document_type.sql: |
     
-    create table if not exists identity_app.id_doc_type
+    create table if not exists identity_app.id_document_type
     (
-        type_doc_id_no
+        id
         numeric
     (
         5
     ) PRIMARY KEY,
-        type_doc_id_code text NOT NULL,
-        type_doc_id_lib text NOT NULL,
-        type_doc_id_lib_en text NOT NULL,
-        type_doc_id_visible text NOT NULL DEFAULT 'Y'
+        code text NOT NULL,
+        label_fr text NOT NULL,
+        label_en text NOT NULL
         );
         
-    ALTER TABLE identity_app.id_doc_type OWNER TO identity_app;
+    ALTER TABLE identity_app.id_document_type OWNER TO identity_app;
 
   02_setup_identity_triggers.sql: |
 
@@ -79,8 +78,8 @@ data:
         IF
     TG_OP = 'DELETE' THEN
     DELETE
-    FROM identity_app.id_doc_type
-    WHERE type_doc_id_no = OLD.type_doc_id_no;
+    FROM identity_app.id_document_type
+    WHERE id = OLD.id;
     
     PERFORM
     set_config('symds.sync_in_progress', 'off', true);
@@ -89,21 +88,20 @@ data:
 
         IF
     TG_OP = 'UPDATE' THEN
-    UPDATE identity_app.id_doc_type
-    SET type_doc_id_no      = NEW.type_doc_id_no,
-        type_doc_id_code    = NEW.type_doc_id_code,
-        type_doc_id_lib     = NEW.type_doc_id_lib,
-        type_doc_id_lib_en  = NEW.type_doc_id_lib_en,
-        type_doc_id_visible = NEW.type_doc_id_visible
-    WHERE type_doc_id_no = OLD.type_doc_id_no;
+    UPDATE identity_app.id_document_type
+    SET id      = NEW.id,
+        code    = NEW.code,
+        label_fr     = NEW.label_fr,
+        label_en  = NEW.label_en
+    WHERE id = OLD.id;
     
     IF
     NOT FOUND THEN
-                INSERT INTO identity_app.id_doc_type (
-                    type_doc_id_no, type_doc_id_code, type_doc_id_lib,
-                    type_doc_id_lib_en, type_doc_id_visible)
-                VALUES (NEW.type_doc_id_no, NEW.type_doc_id_code, NEW.type_doc_id_lib,
-                        NEW.type_doc_id_lib_en, NEW.type_doc_id_visible);
+                INSERT INTO identity_app.id_document_type (
+                    id, code, label_fr,
+                    label_en)
+                VALUES (NEW.id, NEW.code, NEW.label_fr,
+                        NEW.label_en);
     END IF;
 
             PERFORM
@@ -112,10 +110,10 @@ data:
     END IF;
 
         -- TG_OP = 'INSERT'
-    INSERT INTO identity_app.id_doc_type (type_doc_id_no, type_doc_id_code, type_doc_id_lib,
-                                       type_doc_id_lib_en, type_doc_id_visible)
-    VALUES (NEW.type_doc_id_no, NEW.type_doc_id_code, NEW.type_doc_id_lib,
-            NEW.type_doc_id_lib_en, NEW.type_doc_id_visible);
+    INSERT INTO identity_app.id_document_type (id, code, label_fr,
+                                       label_en)
+    VALUES (NEW.id, NEW.code, NEW.label_fr,
+            NEW.label_en);
     
     PERFORM
     set_config('symds.sync_in_progress', 'off', true);
@@ -136,10 +134,10 @@ data:
 
   03_setup_identity_reverse_triggers.sql: |
 
-    DROP TRIGGER IF EXISTS trg_sync_id_doc_type ON identity_app.id_doc_type;
+    DROP TRIGGER IF EXISTS trg_sync_id_document_type ON identity_app.id_document_type;
 
     CREATE
-    OR REPLACE FUNCTION identity_app.sync_id_doc_type()
+    OR REPLACE FUNCTION identity_app.sync_id_document_type()
     RETURNS trigger
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -164,7 +162,7 @@ data:
     TG_OP = 'DELETE' THEN
     DELETE
     FROM symds_identity.type_document_identite
-    WHERE type_doc_id_no = OLD.type_doc_id_no;
+    WHERE id = OLD.id;
     
     PERFORM
     set_config('symds.sync_in_progress', 'off', true);
@@ -174,20 +172,19 @@ data:
         IF
     TG_OP = 'UPDATE' THEN
     UPDATE symds_identity.type_document_identite
-    SET type_doc_id_no      = NEW.type_doc_id_no,
-        type_doc_id_code    = NEW.type_doc_id_code,
-        type_doc_id_lib     = NEW.type_doc_id_lib,
-        type_doc_id_lib_en  = NEW.type_doc_id_lib_en,
-        type_doc_id_visible = NEW.type_doc_id_visible
-    WHERE type_doc_id_no = OLD.type_doc_id_no;
+    SET id      = NEW.id,
+        code    = NEW.code,
+        label_fr     = NEW.label_fr,
+        label_en  = NEW.label_en
+    WHERE id = OLD.id;
     
     IF
     NOT FOUND THEN
                 INSERT INTO symds_identity.type_document_identite (
-                    type_doc_id_no, type_doc_id_code, type_doc_id_lib,
-                    type_doc_id_lib_en, type_doc_id_visible)
-                VALUES (NEW.type_doc_id_no, NEW.type_doc_id_code, NEW.type_doc_id_lib,
-                        NEW.type_doc_id_lib_en, NEW.type_doc_id_visible);
+                    id, code, label_fr,
+                    label_en)
+                VALUES (NEW.id, NEW.code, NEW.label_fr,
+                        NEW.label_en);
     END IF;
 
             PERFORM
@@ -196,10 +193,10 @@ data:
     END IF;
 
         -- TG_OP = 'INSERT'
-    INSERT INTO symds_identity.type_document_identite (type_doc_id_no, type_doc_id_code, type_doc_id_lib,
-                                                       type_doc_id_lib_en, type_doc_id_visible)
-    VALUES (NEW.type_doc_id_no, NEW.type_doc_id_code, NEW.type_doc_id_lib,
-            NEW.type_doc_id_lib_en, NEW.type_doc_id_visible);
+    INSERT INTO symds_identity.type_document_identite (id, code, label_fr,
+                                                       label_en)
+    VALUES (NEW.id, NEW.code, NEW.label_fr,
+            NEW.label_en);
     
     PERFORM
     set_config('symds.sync_in_progress', 'off', true);
@@ -207,12 +204,12 @@ data:
     END;
     $$;
 
-    ALTER FUNCTION identity_app.sync_id_doc_type() OWNER TO identity_app;
+    ALTER FUNCTION identity_app.sync_id_document_type() OWNER TO identity_app;
 
-    CREATE TRIGGER trg_sync_id_doc_type
+    CREATE TRIGGER trg_sync_id_document_type
         AFTER INSERT OR
     UPDATE OR
     DELETE
-    ON identity_app.id_doc_type
+    ON identity_app.id_document_type
         FOR EACH ROW
-        EXECUTE FUNCTION identity_app.sync_id_doc_type();
+        EXECUTE FUNCTION identity_app.sync_id_document_type();
