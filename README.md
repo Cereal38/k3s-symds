@@ -39,8 +39,8 @@ Postgres:
 
 ## Apply modifications in the flyway configmap
 
-1. Update the `k8s/symds-flyway-configmap.yaml` file to add the desired migration
-2. Apply the new version of the file with `kubectl apply -f k8s/symds-flyway-configmap.yaml`
+1. Update the `k8s/symds/symds-flyway-configmap.yaml` file to add the desired migration
+2. Apply the new version of the file with `kubectl apply -f k8s/symds/symds-flyway-configmap.yaml`
 3. Restart the deployment with `kubectl rollout restart deployment/symds-identity`
 
 If the migration adds a new table to sync (`CREATE TABLE` + `sym_trigger`/`sym_trigger_router` rows) and the `identity-001` node has already completed its initial registration, SymmetricDS won't retroactively create/load that table on Postgres on its own — `initial.load.create.first=true` only fires during a node's first registration. Send the schema, then request a reload for just that table:
