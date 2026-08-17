@@ -25,11 +25,13 @@ echo "\n=== Installing CNPG operator  ===\n"
 kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.26/releases/cnpg-1.26.0.yaml
 kubectl -n cnpg-system rollout status deploy/cnpg-controller-manager --timeout=180s # Wait for the previous operation to complete
 
-echo "\n=== Create Postgres DB  ===\n"
+echo "\n=== Create Postgres DBs  ===\n"
 
 # Must exist before the Cluster CR: CNPG only reads it during initdb bootstrap.
 kubectl apply -f k8s/secret/identity-pg-app-secret.yaml
 kubectl apply -f k8s/db/identity-db.yaml
+kubectl apply -f k8s/secret/location-pg-app-secret.yaml
+kubectl apply -f k8s/db/location-db.yaml
 
 echo "\n=== Waiting for Oracle pods to be up... ===\n"
 
@@ -57,8 +59,10 @@ kubectl apply -f k8s/secret/symds-secret.yaml
 kubectl apply -f k8s/symds/symds-flyway-configmap.yaml
 kubectl apply -f k8s/symds/symds-oracle-engine-configmap.yaml
 kubectl apply -f k8s/symds/symds-identity-pg-engine-configmap.yaml
+kubectl apply -f k8s/symds/symds-location-pg-engine-configmap.yaml
 kubectl apply -f k8s/symds/symds-oracle-service.yaml
 kubectl apply -f k8s/symds/symds-identity-service.yaml
+kubectl apply -f k8s/symds/symds-location-service.yaml
 
 echo "\n=== Start the SymDs root node (oracle-000)  ===\n"
 
@@ -68,7 +72,7 @@ echo "\n=== Start the SymDs root node (oracle-000)  ===\n"
 kubectl apply -f k8s/symds/symds-oracle-deployment.yaml
 kubectl rollout status deploy/symds-oracle --timeout=300s
 
-echo "\n=== Waiting for the Postgres cluster to be ready  ===\n"
+echo "\n=== Waiting for the identity-db to be ready  ===\n"
 
 kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=identity-pg --timeout=300s
 
@@ -79,6 +83,15 @@ echo "\n=== Start the SymDs client node (identity-001)  ===\n"
 kubectl apply -f k8s/symds/symds-identity-deployment.yaml
 kubectl rollout status deploy/symds-identity --timeout=300s
 
+echo "\n=== Waiting for the location-db to be ready  ===\n"
+
+kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=location-pg --timeout=300s
+
+echo "\n=== Start the SymDs client node (location-002)  ===\n"
+
+kubectl apply -f k8s/symds/symds-location-deployment.yaml
+kubectl rollout status deploy/symds-location --timeout=300s
+
 echo "\n=== Port-forwarding Oracle and Postgres for local DB clients (e.g. DataGrip)  ===\n"
 
 # Runs in the background so it outlives this script. PIDs/logs go to .pf/ (gitignored)
@@ -86,8 +99,10 @@ echo "\n=== Port-forwarding Oracle and Postgres for local DB clients (e.g. DataG
 mkdir -p .pf
 kubectl port-forward svc/oracle-service 1521:1521 > .pf/oracle.log 2>&1 &
 echo $! > .pf/oracle.pid
-kubectl port-forward svc/identity-pg-rw 5432:5432 > .pf/postgres.log 2>&1 &
-echo $! > .pf/postgres.pid
+kubectl port-forward svc/identity-pg-rw 5432:5432 > .pf/postgres-identity.log 2>&1 &
+echo $! > .pf/postgres-identity.pid
+kubectl port-forward svc/location-pg-rw 5433:5432 > .pf/postgres-location.log 2>&1 &
+echo $! > .pf/postgres-location.pid
 echo "OK"
 
 echo "\n=== Create configmap and job for identity setup  ===\n"

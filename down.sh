@@ -3,7 +3,7 @@
 set -e
 
 # Stop the port-forwards started by up.sh, if still running.
-for pidfile in .pf/oracle.pid .pf/postgres.pid; do
+for pidfile in .pf/*.pid; do
   if [ -f "$pidfile" ]; then
     kill "$(cat "$pidfile")" 2>/dev/null || true
   fi
