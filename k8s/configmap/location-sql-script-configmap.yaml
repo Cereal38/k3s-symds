@@ -198,6 +198,8 @@ data:
         FOR EACH ROW
         EXECUTE FUNCTION location_app.sync_fr_cities_symds_to_app();
 
+    SELECT * FROM symds_location.fr_cities
+
   03_sync_fr_cities_app_to_symds.sql: |
 
     DROP TRIGGER IF EXISTS trg_sync_fr_cities_app_to_symds ON location_app.fr_cities;
@@ -283,3 +285,21 @@ data:
     ON location_app.fr_cities
         FOR EACH ROW
         EXECUTE FUNCTION location_app.sync_fr_cities_app_to_symds();
+
+  04_insert_all_fr_cities_from_symds_to_app.sql: |
+    
+    BEGIN;
+    
+    ALTER TABLE location_app.fr_cities
+        DISABLE TRIGGER trg_sync_fr_cities_app_to_symds;
+    
+    INSERT INTO location_app.fr_cities (id, region_code, dept_code, arrond_code, insee_code, alt_names,
+                                        name_ascii, country_code, geoname_id, latitude, longitude, name, population)
+    SELECT id, region_code, dept_code, arrond_code, insee_code, alt_names,
+           name_ascii, country_code, geoname_id, latitude, longitude, name, population FROM symds_location.fr_cities
+    ON CONFLICT (id) DO NOTHING;
+    
+    ALTER TABLE location_app.fr_cities
+        ENABLE TRIGGER trg_sync_fr_cities_app_to_symds;
+    
+    COMMIT;
