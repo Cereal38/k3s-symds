@@ -25,7 +25,7 @@ echo "Try to insert Grenoble4 in DB"
 kubectl exec -i oracle-db -- sqlplus -S "ora/ora@//localhost:1521/FREEPDB1" <<< "insert into FR_CITIES (ID, REGION_CODE, DEPT_CODE, ARROND_CODE, INSEE_CODE, ALT_NAMES, NAME_ASCII, COUNTRY_CODE, GEONAME_ID, LATITUDE, LONGITUDE, NAME, POPULATION) values (10000000002,84,38,381,38185,'alt_name','Grenoble','FR',3014728,'45.178690','5.714790','Grenoble4',158552);"
 
 echo "Wait 2 seconds for the job to run"
-sleep 2s
+sleep 60s
 
 echo "Try to insert Grenoble5 in DB"
 kubectl exec -i oracle-db -- sqlplus -S "ora/ora@//localhost:1521/FREEPDB1" <<< "insert into FR_CITIES (ID, REGION_CODE, DEPT_CODE, ARROND_CODE, INSEE_CODE, ALT_NAMES, NAME_ASCII, COUNTRY_CODE, GEONAME_ID, LATITUDE, LONGITUDE, NAME, POPULATION) values (10000000003,84,38,381,38185,'alt_name','Grenoble','FR',3014728,'45.178690','5.714790','Grenoble5',158552);"
