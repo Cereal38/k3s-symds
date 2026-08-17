@@ -1,0 +1,285 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: location-sql-script
+  namespace: default
+data:
+  00_setup_user_config.sql: |
+    DO
+    $$
+    BEGIN
+        -- 1. Verify symds schema exists
+        IF
+    NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'symds_location') THEN
+          RAISE EXCEPTION
+            'PRECONDITION FAILED: schema "symds_location" does not exist. SymmetricDS has not initialised this database yet - aborting before any object is created.'
+            USING ERRCODE = 'invalid_schema_name';
+    END IF;
+ 
+        -- 2. the owning role referenced by ALTER DEFAULT PRIVILEGES below
+        IF
+    NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'location') THEN
+          RAISE EXCEPTION
+            'PRECONDITION FAILED: role "location" does not exist - aborting.'
+            USING ERRCODE = 'undefined_object';
+    END IF;
+ 
+        -- 3. every table we are going to mirror / trigger on
+        IF
+    NOT EXISTS (
+              SELECT 1
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'symds_location'
+                AND c.relname = 'fr_cities'
+                AND c.relkind IN ('r', 'p')   -- ordinary or partitioned table
+            ) THEN
+          RAISE EXCEPTION
+            'PRECONDITION FAILED: table "symds_location.fr_cities" not found. SymmetricDS replication has not created it yet - aborting.'
+            USING ERRCODE = 'undefined_table';
+    END IF;
+    END
+    $$;
+ 
+    -- Create the role location_app
+    DO
+    $$
+    BEGIN
+        IF
+    NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'location_app') THEN
+    CREATE ROLE location_app LOGIN PASSWORD 'location_app';
+    END IF;
+    END
+    $$;
+
+  
+    -- Create schema location_app and allow it to connect to the location dabase
+    CREATE SCHEMA IF NOT EXISTS location_app AUTHORIZATION location_app;
+    GRANT
+    CONNECT
+    ON DATABASE location TO location_app;
+    
+    -- Give access to location_app to the symds schema (for everything created before this script)
+    GRANT USAGE ON SCHEMA
+    symds_location TO location_app;
+    GRANT
+    SELECT,
+    INSERT
+    ,
+    UPDATE,
+    DELETE
+    ON ALL TABLES IN SCHEMA symds_location TO location_app;
+    GRANT
+    USAGE,
+    SELECT
+    ON ALL SEQUENCES IN SCHEMA symds_location TO location_app;
+    
+    -- Give access to location_app to the symds schema (for everything created after this script)
+    ALTER
+    DEFAULT PRIVILEGES FOR ROLE location IN SCHEMA symds_location
+        GRANT
+    SELECT,
+    INSERT
+    ,
+    UPDATE,
+    DELETE
+    ON TABLES TO location_app;
+    ALTER
+    DEFAULT PRIVILEGES FOR ROLE location IN SCHEMA symds_location
+        GRANT USAGE,
+    SELECT
+    ON SEQUENCES TO location_app;
+
+  01_create_fr_cities.sql: |
+    
+    CREATE TABLE IF NOT EXISTS location_app.fr_cities (
+      id BIGINT PRIMARY KEY,
+      region_code VARCHAR(10),
+      dept_code VARCHAR(10),
+      arrond_code VARCHAR(10),
+      insee_code VARCHAR(10),
+      alt_names VARCHAR(2000),
+      name_ascii VARCHAR(200),
+      country_code VARCHAR(2),
+      geoname_id BIGINT,
+      latitude NUMERIC(9, 6),
+      longitude NUMERIC(9, 6),
+      name VARCHAR(200),
+      population INTEGER
+    );
+        
+    ALTER TABLE location_app.fr_cities OWNER TO location_app;
+
+  02_sync_fr_cities_symds_to_app.sql: |
+
+    DROP TRIGGER IF EXISTS trg_sync_fr_cities_symds_to_app ON symds_location.fr_cities;
+
+    CREATE
+    OR REPLACE FUNCTION location_app.sync_fr_cities_symds_to_app()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = location_app, pg_catalog
+    AS $$
+    BEGIN
+        /*
+         * Loop guard: the peer trigger sets this flag while it is
+         * propagating a row, so we must not propagate it back.
+         */
+        IF
+    coalesce(current_setting('symds.sync_in_progress', true), 'off') = 'on' THEN
+            IF TG_OP = 'DELETE' THEN RETURN OLD;
+    ELSE RETURN NEW;
+    END IF;
+    END IF;
+
+        PERFORM
+    set_config('symds.sync_in_progress', 'on', true);  -- transaction-local
+
+        IF
+    TG_OP = 'DELETE' THEN
+    DELETE
+    FROM location_app.fr_cities
+    WHERE id = OLD.id;
+    
+    PERFORM
+    set_config('symds.sync_in_progress', 'off', true);
+    RETURN OLD;
+    END IF;
+
+        IF
+    TG_OP = 'UPDATE' THEN
+    UPDATE location_app.fr_cities
+    SET 
+        region_code = NEW.region_code,
+        dept_code = NEW.dept_code,
+        arrond_code = NEW.arrond_code,
+        insee_code = NEW.insee_code,
+        alt_names = NEW.alt_names,
+        name_ascii = NEW.name_ascii,
+        country_code = NEW.country_code,
+        geoname_id = NEW.geoname_id,
+        latitude = NEW.latitude,
+        longitude = NEW.longitude,
+        name = NEW.name,
+        population = NEW.population
+    WHERE id = OLD.id;
+    
+    IF
+    NOT FOUND THEN
+                INSERT INTO location_app.fr_cities (
+                    id, region_code, dept_code, arrond_code, insee_code, alt_names, name_ascii, country_code, geoname_id, latitude, longitude, name, population)
+                VALUES (NEW.id, NEW.region_code, NEW.dept_code, NEW.arrond_code, NEW.insee_code, NEW.alt_names, NEW.name_ascii, NEW.country_code, NEW.geoname_id, NEW.latitude, NEW.longitude, NEW.name, NEW.population);
+    END IF;
+
+            PERFORM
+    set_config('symds.sync_in_progress', 'off', true);
+    RETURN NEW;
+    END IF;
+
+        -- TG_OP = 'INSERT'
+    INSERT INTO location_app.fr_cities (id, region_code, dept_code, arrond_code, insee_code, alt_names, name_ascii, country_code, geoname_id, latitude, longitude, name, population)
+    VALUES (NEW.id, NEW.region_code, NEW.dept_code, NEW.arrond_code, NEW.insee_code, NEW.alt_names, NEW.name_ascii, NEW.country_code, NEW.geoname_id, NEW.latitude, NEW.longitude, NEW.name, NEW.population);
+    
+    PERFORM
+    set_config('symds.sync_in_progress', 'off', true);
+    RETURN NEW;
+    END;
+    $$;
+
+    ALTER FUNCTION location_app.sync_fr_cities_symds_to_app()
+        OWNER TO location_app;
+
+    CREATE TRIGGER trg_sync_fr_cities_symds_to_app
+        AFTER INSERT OR
+    UPDATE OR
+    DELETE
+    ON symds_location.fr_cities
+        FOR EACH ROW
+        EXECUTE FUNCTION location_app.sync_fr_cities_symds_to_app();
+
+  03_sync_fr_cities_app_to_symds.sql: |
+
+    DROP TRIGGER IF EXISTS trg_sync_fr_cities_app_to_symds ON location_app.fr_cities;
+
+    CREATE
+    OR REPLACE FUNCTION location_app.sync_fr_cities_app_to_symds()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = location_app, pg_catalog
+    AS $$
+    BEGIN
+        /*
+         * Loop guard: the peer trigger sets this flag while it is
+         * propagating a row, so we must not propagate it back.
+         */
+        IF
+    coalesce(current_setting('symds.sync_in_progress', true), 'off') = 'on' THEN
+            IF TG_OP = 'DELETE' THEN RETURN OLD;
+    ELSE RETURN NEW;
+    END IF;
+    END IF;
+
+        PERFORM
+    set_config('symds.sync_in_progress', 'on', true);  -- transaction-local
+
+        IF
+    TG_OP = 'DELETE' THEN
+    DELETE
+    FROM symds_location.fr_cities
+    WHERE id = OLD.id;
+    
+    PERFORM
+    set_config('symds.sync_in_progress', 'off', true);
+    RETURN OLD;
+    END IF;
+
+        IF
+    TG_OP = 'UPDATE' THEN
+    UPDATE symds_location.fr_cities
+    SET region_code = NEW.region_code,
+        dept_code = NEW.dept_code,
+        arrond_code = NEW.arrond_code,
+        insee_code = NEW.insee_code,
+        alt_names = NEW.alt_names,
+        name_ascii = NEW.name_ascii,
+        country_code = NEW.country_code,
+        geoname_id = NEW.geoname_id,
+        latitude = NEW.latitude,
+        longitude = NEW.longitude,
+        name = NEW.name,
+        population = NEW.population
+    WHERE id = OLD.id;
+    
+    IF
+    NOT FOUND THEN
+                INSERT INTO symds_location.fr_cities (
+                    id, region_code, dept_code, arrond_code, insee_code, alt_names, name_ascii, country_code, geoname_id, latitude, longitude, name, population)
+                VALUES (NEW.id, NEW.region_code, NEW.dept_code, NEW.arrond_code, NEW.insee_code, NEW.alt_names, NEW.name_ascii, NEW.country_code, NEW.geoname_id, NEW.latitude, NEW.longitude, NEW.name, NEW.population);
+    END IF;
+
+            PERFORM
+    set_config('symds.sync_in_progress', 'off', true);
+    RETURN NEW;
+    END IF;
+
+        -- TG_OP = 'INSERT'
+    INSERT INTO symds_location.fr_cities (id, region_code, dept_code, arrond_code, insee_code, alt_names, name_ascii, country_code, geoname_id, latitude, longitude, name, population)
+    VALUES (NEW.id, NEW.region_code, NEW.dept_code, NEW.arrond_code, NEW.insee_code, NEW.alt_names, NEW.name_ascii, NEW.country_code, NEW.geoname_id, NEW.latitude, NEW.longitude, NEW.name, NEW.population);
+    
+    PERFORM
+    set_config('symds.sync_in_progress', 'off', true);
+    RETURN NEW;
+    END;
+    $$;
+
+    ALTER FUNCTION location_app.sync_fr_cities_app_to_symds() OWNER TO location_app;
+
+    CREATE TRIGGER trg_sync_fr_cities_app_to_symds
+        AFTER INSERT OR
+    UPDATE OR
+    DELETE
+    ON location_app.fr_cities
+        FOR EACH ROW
+        EXECUTE FUNCTION location_app.sync_fr_cities_app_to_symds();
