@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# Seed the Oracle DB with an IDENTITY table and 10 rows.
+# Seed the Oracle DB: the IDENTITY and ID_DOCUMENT_TYPE tables with a handful of
+# rows each, and FR_CITIES bulk-loaded from data/fr_cities.csv with SQL*Loader.
 
 set -e
 
@@ -15,6 +16,7 @@ WHENEVER SQLERROR EXIT FAILURE
 BEGIN
   EXECUTE IMMEDIATE 'DROP TABLE identity PURGE';
   EXECUTE IMMEDIATE 'DROP TABLE id_document_type PURGE';
+  EXECUTE IMMEDIATE 'DROP TABLE fr_cities PURGE';
 EXCEPTION
   WHEN OTHERS THEN NULL; -- table did not exist yet
 END;
@@ -32,6 +34,22 @@ create table id_document_type (
   code VARCHAR2(20) not null,
   label_fr VARCHAR2(100) not null,
   label_en VARCHAR2(100) not null
+);
+
+CREATE TABLE fr_cities (
+  id           NUMBER(12)          PRIMARY KEY,
+  region_code  VARCHAR2(10 CHAR),
+  dept_code    VARCHAR2(10 CHAR),
+  arrond_code  VARCHAR2(10 CHAR),
+  insee_code   VARCHAR2(10 CHAR),
+  alt_names    VARCHAR2(2000 CHAR),
+  name_ascii   VARCHAR2(200 CHAR),
+  country_code VARCHAR2(2 CHAR),
+  geoname_id   NUMBER(12),
+  latitude     NUMBER(9,6),
+  longitude    NUMBER(9,6),
+  name         VARCHAR2(200 CHAR),
+  population   NUMBER(10)
 );
 
 INSERT INTO identity (first_name, last_name, birth_date) values ('Marie', 'Curie', DATE '1867-11-07');
@@ -54,3 +72,34 @@ COMMIT;
 EXIT
 SQL
 
+echo "Start to load cities data (82k rows)..."
+
+kubectl cp data/fr_cities.csv oracle-db:/tmp/fr_cities.csv
+
+kubectl exec -i oracle-db -- sh -c 'cat > /tmp/fr_cities.ctl' <<'CTL'
+OPTIONS (ERRORS=0, ROWS=10000, BINDSIZE=33554432, READSIZE=33554432, SILENT=(HEADER,FEEDBACK))
+LOAD DATA
+CHARACTERSET AL32UTF8
+INFILE '/tmp/fr_cities.csv'
+BADFILE '/tmp/fr_cities.bad'
+TRUNCATE
+INTO TABLE fr_cities
+FIELDS CSV WITH EMBEDDED
+TRAILING NULLCOLS
+(
+  id INTEGER EXTERNAL, region_code CHAR(10), dept_code CHAR(10),
+  arrond_code CHAR(10), insee_code CHAR(10), alt_names CHAR(2000),
+  name_ascii CHAR(200), country_code CHAR(2), geoname_id INTEGER EXTERNAL,
+  latitude DECIMAL EXTERNAL, longitude DECIMAL EXTERNAL, name CHAR(200),
+  population INTEGER EXTERNAL, ignored FILLER CHAR
+)
+CTL
+
+if ! kubectl exec -i oracle-db -- env NLS_NUMERIC_CHARACTERS='.,' \
+     sqlldr userid="$ORACLE_CONN" control=/tmp/fr_cities.ctl log=/tmp/fr_cities.log; then
+  echo "sqlldr failed:" >&2
+  kubectl exec -i oracle-db -- cat /tmp/fr_cities.log >&2 || true
+  exit 1
+fi
+
+echo "Cities data loaded..."

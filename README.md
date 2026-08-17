@@ -139,6 +139,9 @@ up.sh / down.sh          create and destroy the whole stack
 seed-oracle.sh           create and populate the Oracle source tables
 oracle.sh / pg.sh        run a single SQL statement against either database
 
+data/
+  fr_cities.csv          82k French communes, bulk-loaded by seed-oracle.sh
+
 k8s/
   db/                    CloudNativePG Cluster definition
   secret/                Oracle and Postgres credentials
