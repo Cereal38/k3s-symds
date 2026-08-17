@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: symds-location
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: symds-location
+  ports:
+    - port: 31415
+      targetPort: 31415

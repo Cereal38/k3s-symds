@@ -69,3 +69,51 @@ data:
     -- PG -> ORACLE
     insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
     values('typedocid_ora_trigger','identity_2_oracle',100,current_timestamp,current_timestamp);
+
+  V3__symds_location_init_config.sql: |
+    ------------------------------------------------------------------------------
+    -- Node Groups
+    ------------------------------------------------------------------------------
+    insert into sym_node_group (node_group_id, description) values ('location', 'location node');
+    
+    ------------------------------------------------------------------------------
+    -- Node Group Links
+    -- P = oracle pushes to identity, W = identity waits for oracle to pull from it
+    ------------------------------------------------------------------------------
+    insert into sym_node_group_link (source_node_group_id, target_node_group_id, data_event_action) values ('oracle', 'location', 'P');
+    insert into sym_node_group_link (source_node_group_id, target_node_group_id, data_event_action) values ('location', 'oracle', 'W');
+    
+    ------------------------------------------------------------------------------
+    -- Routers
+    -- target_schema_name is where the data lands on the other side.
+    ------------------------------------------------------------------------------
+    insert into sym_router (router_id,source_node_group_id,target_node_group_id,target_schema_name,router_type,create_time,last_update_time)
+    values('oracle_2_location', 'oracle', 'location', 'symds_location', 'default',current_timestamp, current_timestamp);
+    
+    insert into sym_router (router_id,source_node_group_id,target_node_group_id,target_schema_name,router_type,create_time,last_update_time)
+    values('location_2_oracle', 'location', 'oracle', 'ORA', 'default',current_timestamp, current_timestamp);
+    
+    ------------------------------------------------------------------------------
+    -- Channels
+    ------------------------------------------------------------------------------
+    insert into sym_channel (channel_id, processing_order, max_batch_size, enabled, description)
+    values('location', 5, 100000, 1, 'location channel');
+    
+  V4__symds_location_fr_cities.sql: |
+    ------------------------------------------------------------------------------
+    -- Triggers
+    -- source_schema_name lists both sides' schemas because this one config row is
+    -- replicated to every node, and each node matches its own schema from the list.
+    ------------------------------------------------------------------------------
+    insert into sym_trigger (trigger_id, source_schema_name,source_table_name,channel_id,last_update_time,create_time)
+    values('location_ora_trigger', 'LOCATION,symds_location','FR_CITIES','location',current_timestamp,current_timestamp);
+    
+    ------------------------------------------------------------------------------
+    -- Trigger Routers
+    -- Both directions, so the IDENTITY table syncs Oracle <-> Postgres.
+    ------------------------------------------------------------------------------
+    insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
+    values('location_ora_trigger','oracle_2_location',100,current_timestamp,current_timestamp);
+    
+    insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
+    values('location_ora_trigger','location_2_oracle',100,current_timestamp,current_timestamp);
