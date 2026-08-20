@@ -288,7 +288,7 @@ data:
         FOR EACH ROW
         EXECUTE FUNCTION location_app.sync_fr_cities_symds_to_app();
 
-    SELECT * FROM symds_location.fr_cities
+    SELECT COUNT(*) as number_of_cities FROM symds_location.fr_cities
 
   04_sync_fr_cities_app_to_symds.sql: |
 
@@ -393,3 +393,5 @@ data:
         ENABLE TRIGGER trg_sync_fr_cities_app_to_symds;
     
     COMMIT;
+        
+    SELECT COUNT(*) as number_of_cities FROM symds_location.fr_cities
