@@ -110,6 +110,11 @@ echo "\n=== Create configmap and job for identity setup  ===\n"
 kubectl apply -f k8s/configmap/identity-sql-script-configmap.yaml
 kubectl apply -f k8s/job/identity-setup-user-conf-job.yaml
 
+echo "\n=== Create configmap and job for location setup  ===\n"
+
+kubectl apply -f k8s/configmap/location-sql-script-configmap.yaml
+kubectl apply -f k8s/job/location-setup-user-conf-job.yaml
+
 echo "\n=== Done ===\n"
 echo "Replication should appear within ~30s. Check it with:"
 echo "  kubectl exec -it identity-pg-1 -- psql -U postgres -d identity -c 'select * from symds_identity.identity;'"

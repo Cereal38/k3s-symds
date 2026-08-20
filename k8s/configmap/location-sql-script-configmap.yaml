@@ -154,7 +154,8 @@ data:
     DO
     $$
         BEGIN
-            RAISE NOTICE 'All preconditions satisfied.';
+            RAISE
+                NOTICE 'All preconditions satisfied.';
         END
     $$;
     
@@ -167,51 +168,50 @@ data:
     -- Create the role location_app
     DO
     $$
-    BEGIN
-        IF
-    NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'location_app') THEN
-    CREATE ROLE location_app LOGIN PASSWORD 'location_app';
-    END IF;
-    END
+        BEGIN
+            IF
+                NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'location_app') THEN
+                CREATE ROLE location_app LOGIN PASSWORD 'location_app';
+            END IF;
+        END
     $$;
-
-  
+    
+    
     -- Create schema location_app and allow it to connect to the location dabase
     CREATE SCHEMA IF NOT EXISTS location_app AUTHORIZATION location_app;
     GRANT
-    CONNECT
-    ON DATABASE location TO location_app;
+        CONNECT
+        ON DATABASE location TO location_app;
     
     -- Give access to location_app to the symds schema (for everything created before this script)
     GRANT USAGE ON SCHEMA
-    symds_location TO location_app;
+        symds_location TO location_app;
     GRANT
-    SELECT,
-    INSERT
-    ,
-    UPDATE,
-    DELETE
-    ON ALL TABLES IN SCHEMA symds_location TO location_app;
+        SELECT,
+        INSERT,
+        UPDATE,
+        DELETE
+        ON ALL TABLES IN SCHEMA symds_location TO location_app;
     GRANT
-    USAGE,
-    SELECT
-    ON ALL SEQUENCES IN SCHEMA symds_location TO location_app;
+        USAGE,
+        SELECT
+        ON ALL SEQUENCES IN SCHEMA symds_location TO location_app;
     
     -- Give access to location_app to the symds schema (for everything created after this script)
     ALTER
-    DEFAULT PRIVILEGES FOR ROLE location IN SCHEMA symds_location
+        DEFAULT PRIVILEGES FOR ROLE location IN SCHEMA symds_location
         GRANT
-    SELECT,
-    INSERT
-    ,
-    UPDATE,
-    DELETE
-    ON TABLES TO location_app;
+        SELECT,
+        INSERT
+        ,
+        UPDATE,
+        DELETE
+        ON TABLES TO location_app;
     ALTER
-    DEFAULT PRIVILEGES FOR ROLE location IN SCHEMA symds_location
+        DEFAULT PRIVILEGES FOR ROLE location IN SCHEMA symds_location
         GRANT USAGE,
-    SELECT
-    ON SEQUENCES TO location_app;
+        SELECT
+        ON SEQUENCES TO location_app;
 
   02_create_fr_cities.sql: |
     
