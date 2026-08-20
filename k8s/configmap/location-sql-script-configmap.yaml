@@ -6,129 +6,158 @@ metadata:
 data:
   00_check_db_ready.sql: |
     \set ON_ERROR_STOP on
-    
-    -- ============================================================
-    -- Configuration
-    -- ============================================================
-    \set schema_name   symds_location
-    \set role_name     location
-    \set node_id       'location-002'
-    \set timeout_secs  1800 -- TODO: Change timeout
-    
-    -- ============================================================
-    -- Checks 1 & 2: schema and sym_node_security exist
-    -- ============================================================
-    DO $$
+      
+      -- ============================================================
+      -- Generic wait helper (session-local, disappears on disconnect)
+      -- ============================================================
+      CREATE
+    OR REPLACE FUNCTION pg_temp.wait_until(
+      p_label         text,
+      p_condition_sql text,
+      p_timeout_secs  int     DEFAULT 300,
+      p_poll_secs     numeric DEFAULT 2
+      ) RETURNS void AS
+    $fn$
     DECLARE
-    v_schema TEXT := 'symds_location';
+    v_deadline   timestamptz := clock_timestamp()
+      + make_interval(secs => p_timeout_secs);
+      v_ok
+    boolean;
+      v_last_state
+    text := 'condition stayed false';
+      v_waited
+    numeric := 0;
+      v_next_msg
+    numeric := 30;
     BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = v_schema) THEN
-    RAISE EXCEPTION 'Schema % does not exist', v_schema;
+      LOOP
+    BEGIN
+    EXECUTE 'SELECT coalesce((' || p_condition_sql || '), false)' INTO v_ok;
+    v_last_state
+    := 'condition stayed false';
+    EXCEPTION WHEN OTHERS THEN
+      -- object not created yet, etc. -> just "not ready"
+      v_ok := false;
+      v_last_state
+    := SQLERRM;
+    END;
+      
+      IF
+    v_ok THEN
+      RAISE NOTICE '  OK   %  (after % s)', p_label, round(v_waited, 1);
+      RETURN;
     END IF;
-    RAISE NOTICE '[1/6] OK - schema % exists', v_schema;
+      
+      IF
+    clock_timestamp() > v_deadline THEN
+    RAISE EXCEPTION 'Timed out after % s waiting for: %  [last state: %]',
+                          p_timeout_secs, p_label, v_last_state;
+    END IF;
     
-    IF to_regclass(quote_ident(v_schema) || '.sym_node_security') IS NULL THEN
-    RAISE EXCEPTION 'Table %.sym_node_security does not exist', v_schema;
+        IF
+    v_waited >= v_next_msg THEN
+          RAISE NOTICE '  ...  still waiting for % (% s elapsed)',
+                                                        p_label, round(v_waited, 0);
+      v_next_msg
+    := v_next_msg + 30;
     END IF;
-    RAISE NOTICE '[2/6] OK - %.sym_node_security exists', v_schema;
-    END $$;
+      
+      PERFORM
+    pg_sleep(p_poll_secs);
+      v_waited
+    := v_waited + p_poll_secs;
+    END LOOP;
+    END
+    $fn$
+    LANGUAGE plpgsql;
+      
+      -- ============================================================
+      -- 1. schema symds_location
+      -- ============================================================
+    SELECT pg_temp.wait_until(
+                   '[1/6] schema symds_location',
+                   $$ EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'symds_location') $$,
+                   600);
     
     -- ============================================================
-    -- Check 3: wait for initial_load_end_time
+    -- 2. table symds_location.sym_node_security
     -- ============================================================
-    DO $$
-    DECLARE
-    v_node_id  TEXT      := '002';
-    v_deadline TIMESTAMP := clock_timestamp() + INTERVAL '1800 seconds'; -- TODO: Change timeout
-    v_done     BOOLEAN;
-    v_errors   INT;
+    SELECT pg_temp.wait_until(
+                   '[2/6] symds_location.sym_node_security',
+                   $$ to_regclass('symds_location.sym_node_security') IS NOT NULL $$,
+                   600);
+    
+    -- ============================================================
+    -- 3. initial_load_end_time IS NOT NULL
+    --    (row may not exist yet: node not registered -> "not ready")
+    -- ============================================================
+    SELECT pg_temp.wait_until(
+                   '[3/6] initial load finished',
+                   $$ EXISTS (SELECT 1 FROM symds_location.sym_node_security
+      WHERE node_id = '002'
+      AND initial_load_end_time IS NOT NULL) $$,
+                   3600, 5);
+    
+    -- non-fatal diagnostic
+    DO
+    $$
+      DECLARE
+    v_err int;
     BEGIN
-    LOOP
-    SELECT initial_load_end_time IS NOT NULL
-    INTO v_done
-    FROM symds_location.sym_node_security
-    WHERE node_id = v_node_id;
-    
-    IF NOT FOUND THEN
-    RAISE EXCEPTION 'No sym_node_security row for node %', v_node_id;
-    END IF;
-    
-    EXIT WHEN v_done;
-    
-    -- fail fast instead of burning the whole timeout on a broken load
-    IF to_regclass('symds_location.sym_incoming_batch') IS NOT NULL THEN
-    SELECT count(*) INTO v_errors
+      IF
+    to_regclass('symds_location.sym_incoming_batch') IS NOT NULL THEN
+    SELECT count(*)
+    INTO v_err
     FROM symds_location.sym_incoming_batch
     WHERE status = 'ER';
-    IF v_errors > 0 THEN
-    RAISE EXCEPTION 'Initial load has % batch(es) in ER status', v_errors;
+    IF
+    v_err > 0 THEN
+      RAISE WARNING 'initial load ended but % incoming batch(es) in ER', v_err;
     END IF;
     END IF;
-    
-    IF clock_timestamp() > v_deadline THEN
-    RAISE EXCEPTION 'Timed out waiting for initial load of node %', v_node_id;
-    END IF;
-    
-    PERFORM pg_sleep(10);
-    END LOOP;
-    
-    RAISE NOTICE '[3/6] OK - initial load finished for node %', v_node_id;
     END $$;
+      
+      -- ============================================================
+      -- 4. role location
+      -- ============================================================
+    SELECT pg_temp.wait_until(
+                   '[4/6] role location',
+                   $$ EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'location') $$,
+                   300);
     
     -- ============================================================
-    -- Checks 4, 5, 6: role, expected tables, ownership
+    -- 5. expected tables under symds_location
     -- ============================================================
-    DO $$
-    DECLARE
-    v_schema   TEXT   := 'symds_location';
-    v_role     TEXT   := 'location';
-    v_expected TEXT[] := ARRAY['fr_cities'];
-    v_tbl      TEXT;
-    v_missing  TEXT[] := '{}';
-    v_bad      TEXT[] := '{}';
-    v_owner    TEXT;
-    BEGIN
-    -- 4
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_role) THEN
-    RAISE EXCEPTION 'Role % does not exist', v_role;
-    END IF;
-    RAISE NOTICE '[4/6] OK - role % exists', v_role;
+    SELECT pg_temp.wait_until(
+                   '[5/6] table symds_location.fr_cities',
+                   $$ NOT EXISTS (
+      SELECT 1 FROM unnest(ARRAY['fr_cities']) AS t(name)
+      WHERE to_regclass('symds_location.' || quote_ident(t.name)) IS NULL) $$,
+                   600);
     
-    -- 5
-    FOREACH v_tbl IN ARRAY v_expected LOOP
-    IF to_regclass(quote_ident(v_schema) || '.' || quote_ident(v_tbl)) IS NULL THEN
-    v_missing := v_missing || v_tbl;
-    END IF;
-    END LOOP;
+    -- ============================================================
+    -- 6. those tables owned by role location
+    -- ============================================================
+    SELECT pg_temp.wait_until(
+                   '[6/6] fr_cities owned by location',
+                   $$ NOT EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY['fr_cities']) AS t(name)
+      JOIN pg_class     c ON c.relname = t.name
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'symds_location'
+      AND pg_get_userbyid(c.relowner) <> 'location') $$,
+                   600);
     
-    IF cardinality(v_missing) > 0 THEN
-    RAISE EXCEPTION 'Missing table(s) in %: %', v_schema, array_to_string(v_missing, ', ');
-    END IF;
-    RAISE NOTICE '[ 5/6 ] OK - all % expected table(s) present', cardinality(v_expected);
-                                            
-                                            -- 6
-                                            FOREACH v_tbl IN ARRAY v_expected LOOP
-                                            SELECT pg_get_userbyid(c.relowner)
-                                            INTO v_owner
-                                            FROM pg_class c
-                                            JOIN pg_namespace n ON n.oid = c.relnamespace
-                                            WHERE n.nspname = v_schema AND c.relname = v_tbl;
-                                            
-                                            IF v_owner <> v_role THEN
-                                            v_bad := v_bad || format('%s (owner=%s)', v_tbl, v_owner);
-                                            END IF;
-                                            END LOOP;
-                                            
-                                            IF cardinality(v_bad) > 0 THEN
-    RAISE EXCEPTION 'Table(s) not owned by %: %', v_role, array_to_string(v_bad, ', ');
-    END IF;
-    RAISE NOTICE '[ 6/6 ] OK - all expected table(s) owned by %', v_role;
-                                              END $$;
-                                              
-                                              -- ============================================================
-                                              -- Everything validated below this line
-                                              -- ============================================================
-                                              -- CREATE TRIGGER ...
+    DO
+    $$
+    BEGIN RAISE NOTICE 'All preconditions satisfied.';
+    END $$;
+      
+      -- ============================================================
+      -- Everything below runs only once all six checks passed
+      -- ============================================================
+      -- CREATE TRIGGER ...
 
   01_setup_user_config.sql: |
     -- Create the role location_app
