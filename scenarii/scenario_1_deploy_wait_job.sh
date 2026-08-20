@@ -22,7 +22,7 @@ kubectl wait --for=delete pvc -l cnpg.io/cluster=location-pg --timeout=240s || t
 
 echo "=== Recreate location postgres db ==="
 kubectl apply -f k8s/db/location-db.yaml
-kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=location-pg --timeout=300s
+kubectl wait --for=condition=Ready cluster.postgresql.cnpg.io/location-pg --timeout=300s
 
 echo "\n=== Start symds oracle deployment ===\n"
 kubectl apply -f k8s/symds/symds-oracle-deployment.yaml
