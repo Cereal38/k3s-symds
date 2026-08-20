@@ -4,43 +4,133 @@ metadata:
   name: location-sql-script
   namespace: default
 data:
-  00_setup_user_config.sql: |
-    DO
-    $$
+  00_check_db_ready.sql: |
+    \set ON_ERROR_STOP on
+    
+    -- ============================================================
+    -- Configuration
+    -- ============================================================
+    \set schema_name   symds_location
+    \set role_name     location
+    \set node_id       'location-002'
+    \set timeout_secs  1800 -- TODO: Change timeout
+    
+    -- ============================================================
+    -- Checks 1 & 2: schema and sym_node_security exist
+    -- ============================================================
+    DO $$
+    DECLARE
+    v_schema TEXT := 'symds_location';
     BEGIN
-        -- 1. Verify symds schema exists
-        IF
-    NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'symds_location') THEN
-          RAISE EXCEPTION
-            'PRECONDITION FAILED: schema "symds_location" does not exist. SymmetricDS has not initialised this database yet - aborting before any object is created.'
-            USING ERRCODE = 'invalid_schema_name';
+    IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = v_schema) THEN
+    RAISE EXCEPTION 'Schema % does not exist', v_schema;
     END IF;
- 
-        -- 2. the owning role referenced by ALTER DEFAULT PRIVILEGES below
-        IF
-    NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'location') THEN
-          RAISE EXCEPTION
-            'PRECONDITION FAILED: role "location" does not exist - aborting.'
-            USING ERRCODE = 'undefined_object';
+    RAISE NOTICE '[1/6] OK - schema % exists', v_schema;
+    
+    IF to_regclass(quote_ident(v_schema) || '.sym_node_security') IS NULL THEN
+    RAISE EXCEPTION 'Table %.sym_node_security does not exist', v_schema;
     END IF;
- 
-        -- 3. every table we are going to mirror / trigger on
-        IF
-    NOT EXISTS (
-              SELECT 1
-              FROM pg_class c
-              JOIN pg_namespace n ON n.oid = c.relnamespace
-              WHERE n.nspname = 'symds_location'
-                AND c.relname = 'fr_cities'
-                AND c.relkind IN ('r', 'p')   -- ordinary or partitioned table
-            ) THEN
-          RAISE EXCEPTION
-            'PRECONDITION FAILED: table "symds_location.fr_cities" not found. SymmetricDS replication has not created it yet - aborting.'
-            USING ERRCODE = 'undefined_table';
+    RAISE NOTICE '[2/6] OK - %.sym_node_security exists', v_schema;
+    END $$;
+    
+    -- ============================================================
+    -- Check 3: wait for initial_load_end_time
+    -- ============================================================
+    DO $$
+    DECLARE
+    v_node_id  TEXT      := '002';
+    v_deadline TIMESTAMP := clock_timestamp() + INTERVAL '1800 seconds'; -- TODO: Change timeout
+    v_done     BOOLEAN;
+    v_errors   INT;
+    BEGIN
+    LOOP
+    SELECT initial_load_end_time IS NOT NULL
+    INTO v_done
+    FROM symds_location.sym_node_security
+    WHERE node_id = v_node_id;
+    
+    IF NOT FOUND THEN
+    RAISE EXCEPTION 'No sym_node_security row for node %', v_node_id;
     END IF;
-    END
-    $$;
- 
+    
+    EXIT WHEN v_done;
+    
+    -- fail fast instead of burning the whole timeout on a broken load
+    IF to_regclass('symds_location.sym_incoming_batch') IS NOT NULL THEN
+    SELECT count(*) INTO v_errors
+    FROM symds_location.sym_incoming_batch
+    WHERE status = 'ER';
+    IF v_errors > 0 THEN
+    RAISE EXCEPTION 'Initial load has % batch(es) in ER status', v_errors;
+    END IF;
+    END IF;
+    
+    IF clock_timestamp() > v_deadline THEN
+    RAISE EXCEPTION 'Timed out waiting for initial load of node %', v_node_id;
+    END IF;
+    
+    PERFORM pg_sleep(10);
+    END LOOP;
+    
+    RAISE NOTICE '[3/6] OK - initial load finished for node %', v_node_id;
+    END $$;
+    
+    -- ============================================================
+    -- Checks 4, 5, 6: role, expected tables, ownership
+    -- ============================================================
+    DO $$
+    DECLARE
+    v_schema   TEXT   := 'symds_location';
+    v_role     TEXT   := 'location';
+    v_expected TEXT[] := ARRAY['fr_cities'];
+    v_tbl      TEXT;
+    v_missing  TEXT[] := '{}';
+    v_bad      TEXT[] := '{}';
+    v_owner    TEXT;
+    BEGIN
+    -- 4
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_role) THEN
+    RAISE EXCEPTION 'Role % does not exist', v_role;
+    END IF;
+    RAISE NOTICE '[4/6] OK - role % exists', v_role;
+    
+    -- 5
+    FOREACH v_tbl IN ARRAY v_expected LOOP
+    IF to_regclass(quote_ident(v_schema) || '.' || quote_ident(v_tbl)) IS NULL THEN
+    v_missing := v_missing || v_tbl;
+    END IF;
+    END LOOP;
+    
+    IF cardinality(v_missing) > 0 THEN
+    RAISE EXCEPTION 'Missing table(s) in %: %', v_schema, array_to_string(v_missing, ', ');
+    END IF;
+    RAISE NOTICE '[ 5/6 ] OK - all % expected table(s) present', cardinality(v_expected);
+                                            
+                                            -- 6
+                                            FOREACH v_tbl IN ARRAY v_expected LOOP
+                                            SELECT pg_get_userbyid(c.relowner)
+                                            INTO v_owner
+                                            FROM pg_class c
+                                            JOIN pg_namespace n ON n.oid = c.relnamespace
+                                            WHERE n.nspname = v_schema AND c.relname = v_tbl;
+                                            
+                                            IF v_owner <> v_role THEN
+                                            v_bad := v_bad || format('%s (owner=%s)', v_tbl, v_owner);
+                                            END IF;
+                                            END LOOP;
+                                            
+                                            IF cardinality(v_bad) > 0 THEN
+    RAISE EXCEPTION 'Table(s) not owned by %: %', v_role, array_to_string(v_bad, ', ');
+    END IF;
+    RAISE NOTICE '[ 6/6 ] OK - all expected table(s) owned by %', v_role;
+                                              END $$;
+                                              
+                                              -- ============================================================
+                                              -- Everything validated below this line
+                                              -- ============================================================
+                                              -- CREATE TRIGGER ...
+
+  01_setup_user_config.sql: |
     -- Create the role location_app
     DO
     $$
@@ -90,7 +180,7 @@ data:
     SELECT
     ON SEQUENCES TO location_app;
 
-  01_create_fr_cities.sql: |
+  02_create_fr_cities.sql: |
     
     CREATE TABLE IF NOT EXISTS location_app.fr_cities (
       id BIGINT PRIMARY KEY,
@@ -110,7 +200,7 @@ data:
         
     ALTER TABLE location_app.fr_cities OWNER TO location_app;
 
-  02_sync_fr_cities_symds_to_app.sql: |
+  03_sync_fr_cities_symds_to_app.sql: |
 
     DROP TRIGGER IF EXISTS trg_sync_fr_cities_symds_to_app ON symds_location.fr_cities;
 
@@ -200,7 +290,7 @@ data:
 
     SELECT * FROM symds_location.fr_cities
 
-  03_sync_fr_cities_app_to_symds.sql: |
+  04_sync_fr_cities_app_to_symds.sql: |
 
     DROP TRIGGER IF EXISTS trg_sync_fr_cities_app_to_symds ON location_app.fr_cities;
 
@@ -286,7 +376,7 @@ data:
         FOR EACH ROW
         EXECUTE FUNCTION location_app.sync_fr_cities_app_to_symds();
 
-  04_insert_all_fr_cities_from_symds_to_app.sql: |
+  05_insert_all_fr_cities_from_symds_to_app.sql: |
     
     BEGIN;
     
