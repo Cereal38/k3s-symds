@@ -6,74 +6,75 @@ metadata:
 data:
   00_check_db_ready.sql: |
     \set ON_ERROR_STOP on
-      
-      -- ============================================================
-      -- Generic wait helper (session-local, disappears on disconnect)
-      -- ============================================================
-      CREATE
-    OR REPLACE FUNCTION pg_temp.wait_until(
-      p_label         text,
-      p_condition_sql text,
-      p_timeout_secs  int     DEFAULT 300,
-      p_poll_secs     numeric DEFAULT 2
-      ) RETURNS void AS
+    
+    -- ============================================================
+    -- Generic wait helper (session-local, disappears on disconnect)
+    -- ============================================================
+    CREATE
+        OR REPLACE FUNCTION pg_temp.wait_until(
+        p_label text,
+        p_condition_sql text,
+        p_timeout_secs int DEFAULT 300,
+        p_poll_secs numeric DEFAULT 2
+    ) RETURNS void AS
     $fn$
     DECLARE
-    v_deadline   timestamptz := clock_timestamp()
-      + make_interval(secs => p_timeout_secs);
-      v_ok
-    boolean;
-      v_last_state
-    text := 'condition stayed false';
-      v_waited
-    numeric := 0;
-      v_next_msg
-    numeric := 30;
+        v_deadline timestamptz := clock_timestamp()
+            + make_interval(secs => p_timeout_secs);
+        v_ok
+                   boolean;
+        v_last_state
+                   text        := 'condition stayed false';
+        v_waited
+                   numeric     := 0;
+        v_next_msg
+                   numeric     := 30;
     BEGIN
-      LOOP
-    BEGIN
-    EXECUTE 'SELECT coalesce((' || p_condition_sql || '), false)' INTO v_ok;
-    v_last_state
-    := 'condition stayed false';
-    EXCEPTION WHEN OTHERS THEN
-      -- object not created yet, etc. -> just "not ready"
-      v_ok := false;
-      v_last_state
-    := SQLERRM;
-    END;
-      
-      IF
-    v_ok THEN
-      RAISE NOTICE '  OK   %  (after % s)', p_label, round(v_waited, 1);
-      RETURN;
-    END IF;
-      
-      IF
-    clock_timestamp() > v_deadline THEN
-    RAISE EXCEPTION 'Timed out after % s waiting for: %  [last state: %]',
-                          p_timeout_secs, p_label, v_last_state;
-    END IF;
-    
-        IF
-    v_waited >= v_next_msg THEN
-          RAISE NOTICE '  ...  still waiting for % (% s elapsed)',
-                                                        p_label, round(v_waited, 0);
-      v_next_msg
-    := v_next_msg + 30;
-    END IF;
-      
-      PERFORM
-    pg_sleep(p_poll_secs);
-      v_waited
-    := v_waited + p_poll_secs;
-    END LOOP;
+        LOOP
+            BEGIN
+                EXECUTE 'SELECT coalesce((' || p_condition_sql || '), false)' INTO v_ok;
+                v_last_state
+                    := 'condition stayed false';
+            EXCEPTION
+                WHEN OTHERS THEN
+                    -- object not created yet, etc. -> just "not ready"
+                    v_ok := false;
+                    v_last_state
+                        := SQLERRM;
+            END;
+            
+            IF
+                v_ok THEN
+                RAISE NOTICE '  OK   %  (after % s)', p_label, round(v_waited, 1);
+                RETURN;
+            END IF;
+            
+            IF
+                clock_timestamp() > v_deadline THEN
+                RAISE EXCEPTION 'Timed out after % s waiting for: %  [last state: %]',
+                    p_timeout_secs, p_label, v_last_state;
+            END IF;
+            
+            IF
+                v_waited >= v_next_msg THEN
+                RAISE NOTICE '  ...  still waiting for % (% s elapsed)',
+                    p_label, round(v_waited, 0);
+                v_next_msg
+                    := v_next_msg + 30;
+            END IF;
+            
+            PERFORM
+                pg_sleep(p_poll_secs);
+            v_waited
+                := v_waited + p_poll_secs;
+        END LOOP;
     END
     $fn$
-    LANGUAGE plpgsql;
-      
-      -- ============================================================
-      -- 1. schema symds_location
-      -- ============================================================
+        LANGUAGE plpgsql;
+    
+    -- ============================================================
+    -- 1. schema symds_location
+    -- ============================================================
     SELECT pg_temp.wait_until(
                    '[1/6] schema symds_location',
                    $$ EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'symds_location') $$,
@@ -101,25 +102,26 @@ data:
     -- non-fatal diagnostic
     DO
     $$
-      DECLARE
-    v_err int;
-    BEGIN
-      IF
-    to_regclass('symds_location.sym_incoming_batch') IS NOT NULL THEN
-    SELECT count(*)
-    INTO v_err
-    FROM symds_location.sym_incoming_batch
-    WHERE status = 'ER';
-    IF
-    v_err > 0 THEN
-      RAISE WARNING 'initial load ended but % incoming batch(es) in ER', v_err;
-    END IF;
-    END IF;
-    END $$;
-      
-      -- ============================================================
-      -- 4. role location
-      -- ============================================================
+        DECLARE
+            v_err int;
+        BEGIN
+            IF
+                to_regclass('symds_location.sym_incoming_batch') IS NOT NULL THEN
+                SELECT count(*)
+                INTO v_err
+                FROM symds_location.sym_incoming_batch
+                WHERE status = 'ER';
+                IF
+                    v_err > 0 THEN
+                    RAISE WARNING 'initial load ended but % incoming batch(es) in ER', v_err;
+                END IF;
+            END IF;
+        END
+    $$;
+    
+    -- ============================================================
+    -- 4. role location
+    -- ============================================================
     SELECT pg_temp.wait_until(
                    '[4/6] role location',
                    $$ EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'location') $$,
@@ -151,13 +153,15 @@ data:
     
     DO
     $$
-    BEGIN RAISE NOTICE 'All preconditions satisfied.';
-    END $$;
-      
-      -- ============================================================
-      -- Everything below runs only once all six checks passed
-      -- ============================================================
-      -- CREATE TRIGGER ...
+        BEGIN
+            RAISE NOTICE 'All preconditions satisfied.';
+        END
+    $$;
+    
+    -- ============================================================
+    -- Everything below runs only once all six checks passed
+    -- ============================================================
+    -- CREATE TRIGGER ...
 
   01_setup_user_config.sql: |
     -- Create the role location_app
